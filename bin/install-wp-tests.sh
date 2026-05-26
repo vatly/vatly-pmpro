@@ -76,10 +76,13 @@ install_wp() {
 
 	if [ "${WP_IS_NIGHTLY}" -eq 1 ]; then
 		local zip="/tmp/wordpress-nightly.zip"
+		local stage
+		stage="$(mktemp -d /tmp/wp-nightly-stage.XXXXXX)"
 		download "${WP_DOWNLOAD_URL}" "${zip}"
-		unzip -q -o "${zip}" -d /tmp/
-		# nightly zip extracts to /tmp/wordpress/, move contents over.
-		cp -R /tmp/wordpress/. "${WP_CORE_DIR}/"
+		unzip -q -o "${zip}" -d "${stage}"
+		# The nightly zip ships a single top-level `wordpress/` directory.
+		cp -R "${stage}/wordpress/." "${WP_CORE_DIR}/"
+		rm -rf "${stage}"
 	else
 		local tar="/tmp/wordpress.tar.gz"
 		download "${WP_DOWNLOAD_URL}" "${tar}"
