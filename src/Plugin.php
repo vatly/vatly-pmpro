@@ -48,13 +48,20 @@ final class Plugin {
 			return;
 		}
 
+		$this->load_textdomain();
+
+		// The webhook listener is independent of PMPro — we want to receive and
+		// audit webhooks (and tests want to assert the route exists) regardless
+		// of whether PMPro is active. Reactions that touch PMPro internals
+		// short-circuit themselves when PMPro is missing.
+		( new RestRoute( $this->container ) )->register();
+
 		if ( ! $this->pmpro_active() ) {
 			add_action( 'admin_notices', [ $this, 'render_missing_pmpro_notice' ] );
+			$this->booted = true;
 
 			return;
 		}
-
-		$this->load_textdomain();
 
 		// Register the gateway driver on init. The class is intentionally in the
 		// global namespace so PMPro's `new PMProGateway_{slug}()` works.
@@ -65,9 +72,6 @@ final class Plugin {
 		// Admin screens: gateway settings + level-level plan mapping.
 		GatewaySettings::init();
 		LevelOptions::init();
-
-		// Webhook REST route.
-		( new RestRoute( $this->container ) )->register();
 
 		$this->booted = true;
 	}

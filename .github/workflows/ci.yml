@@ -141,11 +141,8 @@ jobs:
           --health-retries=10
 
     env:
-      WP_TESTS_DB_HOST: 127.0.0.1
-      WP_TESTS_DB_NAME: wordpress_test
-      WP_TESTS_DB_USER: root
-      WP_TESTS_DB_PASSWORD: root
-      WP_PHPUNIT__WP_DIR: /tmp/wordpress
+      WP_TESTS_DIR: /tmp/wordpress-tests-lib
+      WP_CORE_DIR: /tmp/wordpress
 
     steps:
       - uses: actions/checkout@v4
@@ -160,28 +157,8 @@ jobs:
       - name: Install plugin deps
         run: composer install --no-interaction --prefer-dist
 
-      - name: Download WordPress ${{ matrix.wp }}
-        run: |
-          set -euxo pipefail
-          mkdir -p "${WP_PHPUNIT__WP_DIR}"
-          case "${{ matrix.wp }}" in
-            trunk)
-              # Nightly tarball lives at /nightly-builds/wordpress-latest.zip
-              curl -sLo /tmp/wp.zip https://wordpress.org/nightly-builds/wordpress-latest.zip
-              unzip -q /tmp/wp.zip -d /tmp/
-              mv /tmp/wordpress/* "${WP_PHPUNIT__WP_DIR}/"
-              ;;
-            latest)
-              curl -sL https://wordpress.org/latest.tar.gz \
-                | tar -xz --strip-components=1 -C "${WP_PHPUNIT__WP_DIR}"
-              ;;
-            *)
-              curl -sL "https://wordpress.org/wordpress-${{ matrix.wp }}.tar.gz" \
-                | tar -xz --strip-components=1 -C "${WP_PHPUNIT__WP_DIR}"
-              ;;
-          esac
-          # Sanity: a freshly-extracted source has wp-load.php at its root.
-          test -f "${WP_PHPUNIT__WP_DIR}/wp-load.php"
+      - name: Install subversion (needed for WP test scaffold)
+        run: sudo apt-get update && sudo apt-get install -y subversion
 
       - name: Wait for MySQL
         run: |
@@ -192,6 +169,13 @@ jobs:
             sleep 1
           done
           echo "MySQL did not come up in time"; exit 1
+
+      # Downloads matching WP core + test scaffold for the matrix slot's
+      # WP version, then creates the wordpress_test DB. WP-version-pinned
+      # scaffolding is the key — wp-phpunit on packagist only ships one
+      # version per release, and that doesn't generalise across the matrix.
+      - name: Install WP ${{ matrix.wp }} test environment
+        run: bin/install-wp-tests.sh wordpress_test root root 127.0.0.1 ${{ matrix.wp }}
 
       - name: PHPUnit integration suite
         run: composer test:integration
