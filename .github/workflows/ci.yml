@@ -109,6 +109,93 @@ jobs:
       - name: WPCS
         run: composer phpcs -- -q --report=checkstyle | cs2pr
 
+  wp-integration:
+    name: WP ${{ matrix.wp }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover the corners that actually break in practice:
+        #   - 6.2 + PHP 8.0: minimum we claim to support
+        #   - latest + PHP 8.3: current stable
+        #   - trunk + PHP 8.3: forward-looking, allowed to fail
+        include:
+          - { wp: '6.2', php: '8.0', allow_failure: false }
+          - { wp: 'latest', php: '8.3', allow_failure: false }
+          - { wp: 'trunk', php: '8.3', allow_failure: true }
+    continue-on-error: ${{ matrix.allow_failure }}
+
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      WP_TESTS_DB_HOST: 127.0.0.1
+      WP_TESTS_DB_NAME: wordpress_test
+      WP_TESTS_DB_USER: root
+      WP_TESTS_DB_PASSWORD: root
+      WP_PHPUNIT__WP_DIR: /tmp/wordpress
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring, intl
+          coverage: none
+          tools: composer:v2
+
+      - name: Install plugin deps
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Download WordPress ${{ matrix.wp }}
+        run: |
+          set -euxo pipefail
+          mkdir -p "${WP_PHPUNIT__WP_DIR}"
+          case "${{ matrix.wp }}" in
+            trunk)
+              # Nightly tarball lives at /nightly-builds/wordpress-latest.zip
+              curl -sLo /tmp/wp.zip https://wordpress.org/nightly-builds/wordpress-latest.zip
+              unzip -q /tmp/wp.zip -d /tmp/
+              mv /tmp/wordpress/* "${WP_PHPUNIT__WP_DIR}/"
+              ;;
+            latest)
+              curl -sL https://wordpress.org/latest.tar.gz \
+                | tar -xz --strip-components=1 -C "${WP_PHPUNIT__WP_DIR}"
+              ;;
+            *)
+              curl -sL "https://wordpress.org/wordpress-${{ matrix.wp }}.tar.gz" \
+                | tar -xz --strip-components=1 -C "${WP_PHPUNIT__WP_DIR}"
+              ;;
+          esac
+          # Sanity: a freshly-extracted source has wp-load.php at its root.
+          test -f "${WP_PHPUNIT__WP_DIR}/wp-load.php"
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h127.0.0.1 -uroot -proot --silent; then
+              echo "MySQL is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "MySQL did not come up in time"; exit 1
+
+      - name: PHPUnit integration suite
+        run: composer test:integration
+
   docker-build:
     name: Docker smoke build
     runs-on: ubuntu-latest

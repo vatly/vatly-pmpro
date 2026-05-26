@@ -153,8 +153,10 @@ The suite uses:
 - **Mockery** for repository/action doubles
 - Custom WP + PMPro stubs in `tests/WPStubs.php` and `tests/PMProStubs.php`
   (sufficient to exercise the plugin without booting WordPress)
-- A separate `integration` test suite intended for `wp-phpunit`-driven runs
-  inside the Docker container
+- A `wp-phpunit`-backed integration suite (`composer test:integration`)
+  that boots a real WordPress install, exercises plugin activation, the
+  `dbDelta` migration, and the webhook REST route end-to-end with a real
+  HMAC signature. Run automatically in CI across WP 6.2 / latest / trunk.
 
 The unit suite covers the gateway driver, both checkout flows (start + return),
 all PMPro-specific webhook reactions, the REST route signature handling, the
