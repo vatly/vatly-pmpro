@@ -18,4 +18,6 @@ composer.lock
 
 # Coverage output
 /coverage/
+
+# Release build outputs (zip + scoped tree + downloaded php-scoper PHAR).
 /build/

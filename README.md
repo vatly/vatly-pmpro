@@ -39,11 +39,18 @@ your memberships:
 
 ## Quick start
 
-### Install from a release zip
+### Install from a release zip (recommended for end users)
 
 1. Download the latest release zip from the
    [Releases](https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/releases)
-   page (the zip ships with `vendor/` pre-built).
+   page. The zip ships with:
+   - `vendor/` already vendored, so **no Composer needed** on the target
+     site;
+   - every PHP namespace prefixed to `Vatly\PMPro\Vendor\…` via
+     [php-scoper](https://github.com/humbug/php-scoper), so the plugin
+     can never collide with another plugin shipping an incompatible
+     version of the same library (`composer/ca-bundle`, future HTTP libs,
+     etc.).
 2. Upload via **Plugins → Add New → Upload Plugin** in WP admin.
 3. Activate.
 4. Browse to **Memberships → Settings → Payment Gateway**, select **Vatly**,
@@ -54,7 +61,7 @@ your memberships:
 6. In your Vatly dashboard, paste the webhook URL shown on the gateway
    settings screen and pick the matching signing secret.
 
-### Install from source
+### Install from source (developer mode)
 
 ```bash
 git clone https://github.com/vatly/vatly-gateway-for-paid-memberships-pro.git
@@ -63,6 +70,24 @@ composer install --no-dev --optimize-autoloader
 ```
 
 Then symlink/copy the directory into your `wp-content/plugins/` directory.
+
+> Heads-up: a `composer install` from source uses **un-scoped** namespaces
+> (`Vatly\Fluent\…`, `Composer\CaBundle\…`). That's fine for development on
+> a clean WP install, but on a production site that runs other plugins
+> shipping the same libraries you should always install from the release
+> zip — it's the only artifact that has php-scoper applied.
+
+### Building a release zip locally
+
+```bash
+bin/build-release.sh                  # → build/vatly-gateway-for-paid-memberships-pro.zip
+VERSION=0.1.0 bin/build-release.sh    # → build/vatly-gateway-for-paid-memberships-pro-0.1.0.zip
+```
+
+The script stages a clean copy of the source, runs `composer install --no-dev`,
+applies php-scoper (config in [`scoper.inc.php`](scoper.inc.php)), regenerates
+the autoload classmap and zips the result. CI runs the same script on every
+PR as a smoke test, and on every `v*` tag as the actual release artifact.
 
 ## How it works
 
