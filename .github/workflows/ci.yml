@@ -32,8 +32,10 @@ jobs:
 
       # `--abandoned=report` keeps abandoned-package warnings visible but
       # doesn't fail the build (those come from upstream phpunit transitively).
+      # Dev deps are audited by default — there's no opt-in flag, and passing
+      # `--no-dev` would *exclude* them.
       - name: Composer audit
-        run: composer audit --no-dev=false --abandoned=report
+        run: composer audit --abandoned=report
 
   tests:
     name: PHP ${{ matrix.php }} tests
