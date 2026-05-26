@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Integration;
 
 use Vatly\PMPro\Configuration;
+use Vatly\PMPro\Install\Activator;
 use Vatly\PMPro\Webhooks\RestRoute;
 use WP_REST_Request;
 use WP_UnitTestCase;
@@ -18,6 +19,11 @@ class WebhookRouteTest extends WP_UnitTestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+
+		// Activation hook normally fires on plugin install; in the test
+		// environment we trigger it explicitly so the audit table exists
+		// when the WebhookProcessor writes its record.
+		Activator::activate();
 
 		update_option( Configuration::OPTION_WEBHOOK_SECRET, self::SECRET );
 
@@ -62,21 +68,21 @@ class WebhookRouteTest extends WP_UnitTestCase {
 	}
 
 	public function test_valid_signature_is_accepted_and_returns_200(): void {
-		$payload = wp_json_encode(
+		// Pick an event name fluent doesn't recognize — it'll dispatch an
+		// `UnsupportedWebhookReceived` event and skip every reaction. This
+		// isolates the test to "signature passes, audit row written, route
+		// returns 200" without depending on PMPro tables existing.
+		$event_id = 'evt_test_' . uniqid();
+		$payload  = wp_json_encode(
 			[
-				'id'         => 'evt_test_' . uniqid(),
-				'resource'   => 'subscription',
-				'eventName'  => 'subscription.started',
-				'entityType' => 'subscription',
-				'entityId'   => 'sub_test',
+				'id'         => $event_id,
+				'resource'   => 'test',
+				'eventName'  => 'test.echo',
+				'entityType' => 'test',
+				'entityId'   => 'tst_1',
 				'testmode'   => true,
 				'createdAt'  => gmdate( 'c' ),
-				'object'     => [
-					'customerId'         => 'cus_test',
-					'subscriptionPlanId' => 'plan_test',
-					'name'               => 'Test',
-					'quantity'           => 1,
-				],
+				'object'     => [ 'customerId' => 'cus_test' ],
 			]
 		);
 
@@ -90,6 +96,18 @@ class WebhookRouteTest extends WP_UnitTestCase {
 		$data = $response->get_data();
 		self::assertIsArray( $data );
 		self::assertTrue( $data['received'] ?? false );
+
+		// The audit row should exist now.
+		global $wpdb;
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT vatly_id, event_name FROM {$wpdb->prefix}vatly_webhook_calls WHERE vatly_id = %s",
+				$event_id
+			),
+			ARRAY_A
+		);
+		self::assertNotNull( $row, 'Expected the webhook to be audit-logged.' );
+		self::assertSame( 'test.echo', $row['event_name'] );
 	}
 
 	private function dispatch( string $body, string $signature ): \WP_REST_Response {
