@@ -104,8 +104,10 @@ jobs:
 
       - run: composer install --no-interaction --prefer-dist
 
+      # `-q` suppresses the progress bar + timing footer that PHPCS would
+      # otherwise interleave with the checkstyle XML, which cs2pr can't parse.
       - name: WPCS
-        run: composer phpcs -- --report=checkstyle | cs2pr
+        run: composer phpcs -- -q --report=checkstyle | cs2pr
 
   docker-build:
     name: Docker smoke build
