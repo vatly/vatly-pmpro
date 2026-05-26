@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<ruleset name="vatly-gateway-for-paid-memberships-pro">
+    <description>
+        Pragmatic WPCS profile for this plugin.
+
+        Goal: catch real security / i18n / DB issues that ship in production. We
+        deliberately drop:
+          - Squiz.Commenting.* — modern PHP 8 type hints replace docblocks.
+          - Generic.Arrays.DisallowShortArraySyntax — short syntax is fine.
+          - Universal.Arrays.DisallowShortArraySyntax — same.
+          - WordPress.Files.FileName — PSR-4 + the standalone gateway file
+            both legitimately break PMPro's `class-xxx.php` convention or our
+            namespaced layout.
+          - File / class doc comment checks — Squiz is too eager.
+
+        Kept:
+          - Security sniffs (Nonce, EscapeOutput, ValidatedSanitizedInput).
+          - I18n (text domain match, missing translators comment).
+          - DB.PreparedSQL family.
+          - PHP compatibility floor (8.0+).
+    </description>
+
+    <file>src</file>
+    <file>includes</file>
+    <file>vatly-gateway-for-paid-memberships-pro.php</file>
+
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+    <exclude-pattern>*/docker/*</exclude-pattern>
+    <exclude-pattern>*/.phpunit.cache/*</exclude-pattern>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+    <arg name="cache" value=".phpcs.cache"/>
+
+    <config name="minimum_supported_wp_version" value="6.2"/>
+    <config name="testVersion" value="8.0-"/>
+
+    <!-- Allow PHPCS to find WPCS without a global install. -->
+    <config name="installed_paths"
+            value="../../wp-coding-standards/wpcs,../../phpcsstandards/phpcsutils,../../phpcsstandards/phpcsextra,../../phpcompatibility/php-compatibility,../../phpcompatibility/phpcompatibility-paragonie,../../phpcompatibility/phpcompatibility-wp"/>
+
+    <!-- Core WordPress sniffs minus the noisy ones for a modern PHP 8 codebase. -->
+    <rule ref="WordPress-Core">
+        <exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+        <exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+        <exclude name="Universal.Operators.DisallowShortTernary"/>
+        <exclude name="WordPress.PHP.YodaConditions"/>
+        <exclude name="WordPress.Files.FileName"/>
+        <exclude name="Squiz.Commenting.FileComment"/>
+        <exclude name="Squiz.Commenting.FunctionComment"/>
+        <exclude name="Squiz.Commenting.ClassComment"/>
+        <exclude name="Squiz.Commenting.VariableComment"/>
+        <exclude name="Squiz.Commenting.InlineComment"/>
+        <exclude name="Generic.Commenting.DocComment"/>
+        <exclude name="WordPress.NamingConventions.ValidVariableName"/>
+        <exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+        <exclude name="WordPress.NamingConventions.ValidHookName"/>
+        <exclude name="WordPress.WhiteSpace.ControlStructureSpacing"/>
+        <exclude name="Generic.WhiteSpace.ScopeIndent"/>
+        <exclude name="Generic.WhiteSpace.DisallowSpaceIndent"/>
+        <exclude name="WordPress.Arrays.MultipleStatementAlignment"/>
+        <exclude name="WordPress.Arrays.ArrayIndentation"/>
+        <exclude name="PEAR.Functions.FunctionCallSignature"/>
+        <exclude name="WordPress.PHP.DevelopmentFunctions"/>
+        <exclude name="WordPress.PHP.DiscouragedPHPFunctions"/>
+        <!-- PMPro instantiates gateway classes as `PMProGateway_{slug}` and the
+             slug is lowercase by convention (PMProGateway_paypalexpress,
+             PMProGateway_stripe, …). Our class must match the slug exactly. -->
+        <exclude name="PEAR.NamingConventions.ValidClassName"/>
+        <!-- Parameter names like $object / $resource / $class are inherited
+             from the fluent WebhookCallRepositoryInterface contract — we can't
+             change them without forking the upstream interface. -->
+        <exclude name="Universal.NamingConventions.NoReservedKeywordParameterNames"/>
+    </rule>
+
+    <rule ref="PHPCompatibilityWP"/>
+
+    <!-- Tighten text-domain enforcement using the modern element syntax. -->
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="vatly-pmpro"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>

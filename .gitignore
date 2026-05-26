@@ -1,0 +1,21 @@
+/vendor/
+/node_modules/
+composer.lock
+.phpunit.cache/
+.phpunit.result.cache
+.phpcs.cache
+.phpunit.cache
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+.envrc
+.env
+
+# Local Docker volumes
+/docker/data/
+
+# Coverage output
+/coverage/
+/build/

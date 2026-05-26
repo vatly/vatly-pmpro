@@ -1,0 +1,23 @@
+FROM wordpress:6.5-php8.2-apache
+
+# Composer + git for installing the plugin's PHP deps inside the container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git unzip less \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# Default php settings tweaks.
+RUN { \
+        echo 'memory_limit = 256M'; \
+        echo 'max_execution_time = 120'; \
+        echo 'display_errors = Off'; \
+        echo 'log_errors = On'; \
+        echo 'error_log = /tmp/php-error.log'; \
+    } > /usr/local/etc/php/conf.d/zz-vatly-pmpro.ini
+
+# Permissive upload limits for the test environment.
+RUN { \
+        echo 'upload_max_filesize = 64M'; \
+        echo 'post_max_size = 64M'; \
+    } > /usr/local/etc/php/conf.d/zz-uploads.ini

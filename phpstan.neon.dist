@@ -1,0 +1,14 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - includes
+    excludePaths:
+        - vendor/*
+    ignoreErrors:
+        # WP globals + PMPro functions guarded with function_exists() / class_exists().
+        -
+            message: '#Function (get_pmpro_membership_level_meta|update_pmpro_membership_level_meta|get_pmpro_membership_order_meta|update_pmpro_membership_order_meta|pmpro_getLevel|pmpro_getGateway|pmpro_getMembershipLevelForUser|pmpro_changeMembershipLevel|pmpro_url|pmpro_get_element_class|pmpro_isLevelRecurring|pmpro_getMatchingOrderCode) not found#'

@@ -1,0 +1,83 @@
+{
+    "name": "vatly/vatly-gateway-for-paid-memberships-pro",
+    "description": "Vatly merchant-of-record payment gateway for Paid Memberships Pro. Stop maintaining your own VAT logic.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://vatly.com",
+    "keywords": [
+        "wordpress",
+        "wordpress-plugin",
+        "paid-memberships-pro",
+        "pmpro",
+        "vatly",
+        "vat",
+        "eu-vat",
+        "merchant-of-record",
+        "payment-gateway"
+    ],
+    "authors": [
+        {
+            "name": "Sander van Hooft",
+            "email": "sander@sandorian.com",
+            "homepage": "https://vatly.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues",
+        "source": "https://github.com/vatly/vatly-gateway-for-paid-memberships-pro"
+    },
+    "require": {
+        "php": ">=8.0",
+        "vatly/vatly-fluent-php": "^0.6.0-alpha.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "brain/monkey": "^2.6",
+        "mockery/mockery": "^1.6",
+        "yoast/phpunit-polyfills": "^2.0",
+        "phpstan/phpstan": "^1.10",
+        "szepeviktor/phpstan-wordpress": "^1.3",
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "wp-phpunit/wp-phpunit": "^6.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vatly\\PMPro\\": "src/"
+        },
+        "files": [
+            "includes/class-pmprogateway-vatly.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vatly\\PMPro\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite=unit",
+        "test:integration": "phpunit --testsuite=integration",
+        "analyse": "phpstan analyse --memory-limit=512M",
+        "phpcs": "phpcs",
+        "phpcbf": "phpcbf"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.0"
+        },
+        "allow-plugins": {
+            "composer/installers": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

@@ -1,0 +1,47 @@
+=== Vatly Gateway for Paid Memberships Pro ===
+Contributors: vatly
+Tags: paid memberships pro, pmpro, vat, eu vat, payment gateway, merchant of record
+Requires at least: 6.2
+Tested up to: 6.5
+Requires PHP: 8.0
+Stable tag: 0.1.0
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Sell PMPro memberships through Vatly — the merchant of record that handles EU VAT, payment methods and recurring billing for you.
+
+== Description ==
+
+Vatly is a merchant-of-record billing platform built for SaaS and membership sites. This plugin adds Vatly as a gateway option to Paid Memberships Pro, so:
+
+* Your customers pay at Vatly's hosted checkout (cards, PayPal, iDEAL, Apple Pay, SEPA).
+* Vatly collects VAT per country, applies the right rate, and issues compliant invoices in your name.
+* PMPro continues to handle membership levels, content gating, member dashboards and discount codes.
+* Webhooks sync subscription state — levels are assigned on payment and revoked on cancellation.
+
+== Installation ==
+
+1. Upload the plugin zip via Plugins → Add New → Upload Plugin and activate it.
+2. Browse to Memberships → Settings → Payment Gateway and pick "Vatly".
+3. Paste your Live + Test API keys and your webhook signing secret.
+4. Copy the webhook URL shown on the settings page into your Vatly dashboard.
+5. For each membership level you want billed through Vatly, edit the level and paste the matching Vatly plan id into the "Vatly Plan ID" field.
+
+== Frequently Asked Questions ==
+
+= Does this replace the pmpro-vat-tax addon? =
+
+Yes. With Vatly as the merchant of record, your PMPro site shows the all-in price and Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+
+= What payment methods are supported? =
+
+Cards, PayPal, iDEAL, Apple Pay, SEPA, and a growing list — Vatly enables them per merchant via the hosted checkout.
+
+= Where can I report bugs or request features? =
+
+GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
+
+== Changelog ==
+
+= 0.1.0 =
+* Initial release: gateway driver, webhook listener, PMPro-specific reactions, admin settings, level → plan mapping, Docker dev environment.
