@@ -73,8 +73,9 @@ class OrderRepositoryTest extends TestCase {
 
 		self::assertInstanceOf(OrderModel::class, $order);
 
-		// First write should be the INSERT.
-		$insert = $wpdb->queries[0];
+		// First query is now the token-order lookup (returns nothing here so
+		// we fall through to INSERT); INSERT is the second.
+		$insert = $wpdb->queries[1];
 		self::assertSame('insert', $insert[0]);
 		[$table, $data] = $insert[1];
 		self::assertStringContainsString('pmpro_membership_orders', $table);
@@ -83,6 +84,62 @@ class OrderRepositoryTest extends TestCase {
 		self::assertSame('19.00', $data['subtotal']);
 		self::assertSame('vatly', $data['gateway']);
 		self::assertSame('ord_1', $data['payment_transaction_id']);
+	}
+
+	public function test_store_converts_existing_token_order_instead_of_inserting(): void {
+		// Scenario: webhook arrives for the same Vatly checkout that produced
+		// a token order via start_hosted_checkout(). Without the guard we'd
+		// INSERT a duplicate row.
+		$user     = new WP_User();
+		$user->ID = 42;
+
+		$customers = \Mockery::mock(CustomerRepositoryInterface::class);
+		$customers->shouldReceive('findByVatlyId')->andReturn(new UserBillable($user));
+
+		Functions\when('get_option')->justReturn('EUR');
+		Functions\when('current_time')->justReturn('2026-01-01 00:00:00');
+		Functions\when('wp_json_encode')->alias('json_encode');
+
+		global $wpdb;
+		// find_pending_token_order_id() returns id=99 — there *is* a pending row.
+		$wpdb->next_var = 99;
+		// hydrate() will pull this back after the UPDATE.
+		$wpdb->next_row = [
+			'id'                          => 99,
+			'user_id'                     => 42,
+			'membership_id'               => 0,
+			'code'                        => 'TOKEN',
+			'payment_transaction_id'      => 'ord_real',
+			'status'                      => 'success',
+			'subtotal'                    => '19.00',
+			'tax'                         => '4.00',
+			'total'                       => '23.00',
+			'notes'                       => json_encode(['vatly_currency' => 'EUR']),
+			'payment_type'                => 'creditcard',
+			'subscription_transaction_id' => '',
+		];
+
+		(new OrderRepository($customers))->store(new StoreOrderData(
+			vatlyId: 'ord_real',
+			customerId: 'cus_1',
+			status: 'paid',
+			total: 2300,
+			currency: 'EUR',
+			paymentMethod: 'creditcard',
+		));
+
+		// We expect: get_var (token lookup) → update (convert in place) → get_row (re-read).
+		// Crucially, NO insert.
+		$ops = array_column($wpdb->queries, 0);
+		self::assertContains('update', $ops, 'Token order should be converted in place.');
+		self::assertNotContains('insert', $ops, 'No duplicate INSERT should occur.');
+
+		// Verify the UPDATE targets the right row + transitions to success.
+		$update_idx = array_search('update', $ops, true);
+		[, $data, $where] = $wpdb->queries[$update_idx][1];
+		self::assertSame(['id' => 99], $where);
+		self::assertSame('success', $data['status']);
+		self::assertSame('ord_real', $data['payment_transaction_id']);
 	}
 
 	public function test_store_raises_when_customer_unknown(): void {
@@ -186,7 +243,9 @@ class OrderRepositoryTest extends TestCase {
 		));
 
 		// JPY has no minor unit — the stored decimal must equal the cents value.
-		$insert = $wpdb->queries[0];
+		// queries[0] is the token-order lookup; queries[1] is the INSERT.
+		$insert = $wpdb->queries[1];
+		self::assertSame('insert', $insert[0]);
 		[, $data] = $insert[1];
 		self::assertSame('5000', $data['total']);
 	}

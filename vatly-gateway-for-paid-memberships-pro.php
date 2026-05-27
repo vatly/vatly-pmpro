@@ -49,12 +49,16 @@ if ( ! file_exists( $vatly_pmpro_autoload ) ) {
 
 require_once $vatly_pmpro_autoload;
 
+// Boot at priority 20 — *after* PMPro's default load priority of 10. This
+// guarantees the global `PMProGateway` base class exists by the time we try to
+// load our `PMProGateway_vatly` subclass, regardless of plugin file ordering
+// (alphabetical, MU-plugin contexts, custom loaders).
 add_action(
 	'plugins_loaded',
 	static function () {
 		\Vatly\PMPro\Plugin::instance()->boot();
 	},
-	5
+	20
 );
 
 register_activation_hook(

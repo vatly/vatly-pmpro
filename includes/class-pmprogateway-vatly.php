@@ -70,9 +70,17 @@ if ( ! class_exists( 'PMProGateway_vatly', false ) && class_exists( 'PMProGatewa
 		}
 
 		public static function supports( $feature ) {
+			// `payment_method_updates` is intentionally false. PMPro's billing
+			// page expects a synchronous form submission to update the payment
+			// method, but Vatly's update flow uses a hosted page (members get
+			// a signed link from `SubscriptionHandle::updateBilling()`). The
+			// two models don't compose; advertising `true` here would make
+			// PMPro show a success toast even though nothing was pushed to
+			// Vatly. A dedicated "update billing at Vatly" admin/member UI
+			// is tracked separately.
 			$supports = [
 				'subscription_sync'      => true,
-				'payment_method_updates' => true,
+				'payment_method_updates' => false,
 			];
 
 			return $supports[ $feature ] ?? false;

@@ -181,9 +181,18 @@ final class CheckoutProcessor {
 			return false;
 		}
 
-		// Still pending. Let PMPro hold at the confirmation page; webhook will
-		// flip the order to success in the background.
-		return true;
+		// Still pending. CRITICAL: return false here, not true. PMPro's
+		// checkout preheader does `$pmpro_confirmed = true` whenever process()
+		// returns truthy, then calls pmpro_complete_checkout() which assigns
+		// the membership level — before Vatly has confirmed payment. Returning
+		// false keeps the order in `token` status and surfaces the message
+		// below to the user. The webhook will independently assign the level
+		// via AssignMembershipLevelOnStarted when it arrives; the user can
+		// refresh and process() will re-check Vatly and complete normally.
+		$order->error      = __( "Your Vatly payment is still being confirmed. Please refresh this page in a moment — we'll complete your membership as soon as the payment settles.", 'vatly-pmpro' );
+		$order->shorterror = __( 'Awaiting Vatly confirmation.', 'vatly-pmpro' );
+
+		return false;
 	}
 
 	public static function cancel( Container $container, $order ): bool {

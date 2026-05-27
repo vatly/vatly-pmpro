@@ -44,10 +44,7 @@
     "autoload": {
         "psr-4": {
             "Vatly\\PMPro\\": "src/"
-        },
-        "files": [
-            "includes/class-pmprogateway-vatly.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {

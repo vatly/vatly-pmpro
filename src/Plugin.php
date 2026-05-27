@@ -63,9 +63,15 @@ final class Plugin {
 			return;
 		}
 
-		// Register the gateway driver on init. The class is intentionally in the
-		// global namespace so PMPro's `new PMProGateway_{slug}()` works.
-		if ( class_exists( '\PMProGateway_vatly' ) ) {
+		// Load the global PMProGateway_vatly class file now that PMPro itself
+		// is guaranteed loaded (we boot at plugins_loaded:20). We require this
+		// explicitly rather than via composer's `files` autoload because the
+		// latter runs immediately on plugin file load — before WP has loaded
+		// PMPro — and the conditional class definition inside the file would
+		// otherwise see `class_exists('PMProGateway') === false` and skip.
+		require_once dirname( __DIR__ ) . '/includes/class-pmprogateway-vatly.php';
+
+		if ( class_exists( '\PMProGateway_vatly', false ) ) {
 			\PMProGateway_vatly::init( $this->container );
 		}
 

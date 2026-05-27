@@ -71,7 +71,7 @@ class CheckoutProcessorTest extends TestCase {
 		self::assertSame('error', $order->status);
 	}
 
-	public function test_finalize_returns_true_but_pending_when_status_unknown(): void {
+	public function test_finalize_returns_false_when_status_is_still_pending(): void {
 		$container = new Container();
 
 		$checkout         = new ApiCheckout(\Mockery::mock(VatlyApiClient::class));
@@ -89,8 +89,14 @@ class CheckoutProcessorTest extends TestCase {
 		$order->id     = 9;
 		$order->status = 'token';
 
-		self::assertTrue(CheckoutProcessor::process($container, $order));
+		// CRITICAL: must return false so PMPro doesn't call
+		// pmpro_complete_checkout() and assign the level before Vatly has
+		// confirmed payment. See `pmpro_processed` check in PMPro's
+		// preheaders/checkout.php — any truthy return triggers level
+		// assignment, regardless of order status.
+		self::assertFalse(CheckoutProcessor::process($container, $order));
 		self::assertSame('token', $order->status);
+		self::assertNotEmpty($order->error, 'Expected a friendly pending message to be set.');
 	}
 
 	public function test_finalize_returns_false_when_api_throws(): void {

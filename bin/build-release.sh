@@ -97,7 +97,6 @@ $path = $argv[1];
 $composer = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
 $composer["autoload"] = [
     "classmap" => ["src/", "includes/", "vendor/"],
-    "files"    => ["includes/class-pmprogateway-vatly.php"],
 ];
 unset($composer["autoload-dev"], $composer["require-dev"], $composer["scripts"]);
 file_put_contents(
