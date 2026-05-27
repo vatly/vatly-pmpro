@@ -50,11 +50,17 @@ final class CheckoutProcessor {
 	}
 
 	private static function start_hosted_checkout( Container $container, $order ): bool {
+		// PMPro guarantees $order->user_id is populated by the time it calls
+		// gateway::process() — for both logged-in members AND guests (PMPro
+		// creates the WP user just before this point via
+		// pmpro_checkout_create_user()). This defensive fallback only kicks
+		// in for pathological flows (CLI tooling, third-party plugins that
+		// re-enter the gateway chain) where user_id genuinely is missing.
 		$user = self::resolve_user( $order );
 
 		if ( ! $user ) {
-			$order->error      = __( 'Cannot start Vatly checkout without a WordPress user.', 'vatly-pmpro' );
-			$order->shorterror = $order->error;
+			$order->error      = __( 'Could not start checkout — the order is missing a user. Please refresh and try again.', 'vatly-pmpro' );
+			$order->shorterror = __( 'Order user missing.', 'vatly-pmpro' );
 
 			return false;
 		}
