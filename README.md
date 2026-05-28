@@ -149,6 +149,75 @@ Per-level setup:
 
 - Edit a PMPro level → scroll to **Vatly Plan** → paste the `plan_xxx` id.
 
+## FAQ
+
+**Will this break my LearnDash / BuddyBoss / WP Fusion / [LMS] integration?**
+No. We assign levels via `pmpro_changeMembershipLevel()`, which fires
+`pmpro_after_change_membership_level` — the same action your LMS / community
+plugin / CRM sync is already wired to. From PMPro's perspective the gateway
+is irrelevant; the level change looks identical to a Stripe checkout.
+
+**Do recurring renewals work without the member doing anything?**
+Yes. Vatly bills the customer on the plan's cycle and fires an `order.paid`
+webhook. Our reaction writes the renewal order row to
+`pmpro_membership_orders` and stamps the active subscription id onto it.
+The member's level doesn't change (it's already assigned); the next-payment
+date moves forward via PMPro's subscription record.
+
+**How do refunds work?**
+Customer-initiated refunds happen at Vatly (it's the merchant of record).
+When Vatly issues a refund, the `subscription.canceled_immediately` or
+equivalent webhook fires and our reaction revokes the level via
+`pmpro_changeMembershipLevel(0, $user_id)`. A PMPro-admin-side "refund this
+order" button that drives Vatly's API is on the roadmap; today refunds are
+issued from your Vatly dashboard.
+
+**What about discount codes?**
+PMPro's own discount codes work — they apply pre-checkout, and we send the
+discounted total to Vatly. Vatly's own coupon system isn't surfaced through
+PMPro yet (separate roadmap item).
+
+**Can I switch existing Stripe / PayPal members to Vatly?**
+Realistically no — and we don't try. New subscriptions go to Vatly, existing
+ones keep billing through whatever they started on. Switching a live
+subscription between gateways means refunding + re-collecting, which most
+PMPro merchants won't accept. Treat this as a **new-customer-only**
+acquisition path.
+
+**What's not yet supported?**
+- Vatly-side refunds triggered from the PMPro admin order screen
+- Vatly coupons exposed as a PMPro discount code source
+- Surfacing the MoR invoice PDF URL on the PMPro member dashboard
+- Cancellation-with-grace-period notification email
+
+These are in [Roadmap](#roadmap). Each is small.
+
+**What versions are actually tested?**
+
+| Axis        | Required-pass corners                  | Forward-warning |
+|-------------|----------------------------------------|-----------------|
+| PHP         | 8.1, 8.2, 8.3                          | —               |
+| WordPress   | 6.5 (minimum we claim), latest stable  | trunk           |
+| PMPro       | 3.0+                                   | —               |
+| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.1`      | —               |
+
+CI runs unit + integration suites across these on every PR.
+
+**I want to hook custom logic when payments happen — what do I add_action to?**
+Two surfaces:
+
+- PMPro's native hooks (`pmpro_after_change_membership_level`,
+  `pmpro_after_checkout`, etc.) — fired by us indirectly, same as any
+  other gateway.
+- Vatly-specific events we dispatch alongside the PMPro hooks:
+  `vatly_pmpro_OrderPaid`, `vatly_pmpro_SubscriptionStarted`,
+  `vatly_pmpro_SubscriptionCanceledImmediately`,
+  `vatly_pmpro_SubscriptionCanceledWithGracePeriod`, plus a
+  `vatly_pmpro_event` catch-all. These carry full fluent event DTOs with
+  tax breakdown, invoice number, payment method — handy for emitting your
+  own member-facing emails or pushing into a CRM with Vatly-specific
+  context PMPro doesn't carry.
+
 ## Local development
 
 A self-contained Docker sandbox with **WordPress + PMPro + a mock Vatly server**
