@@ -118,18 +118,68 @@ class PMProStoreOrderOnPaidTest extends TestCase {
 		$this->assertHookExpectations();
 	}
 
-	public function test_getOrder_failure_falls_through_to_insert(): void {
-		// If the API call to fetch metadata fails, we still want the order
-		// row written — better one row (possibly anonymous) than a dropped
-		// webhook. The browser-return path can reconcile later.
+	public function test_getOrder_failure_throws_when_user_has_pending_token_orders(): void {
+		// The reviewer's concern: if `GetOrder` fails, we can't tell whether
+		// this is an initial purchase (which would have a matching token row
+		// the browser-return will later upgrade) or a renewal (where INSERT
+		// is correct). When there's *any* unmatched token order for the
+		// bound user, INSERT would risk a duplicate row — throw instead so
+		// Vatly retries the webhook later (when GetOrder will likely succeed,
+		// or when the browser-return has already converted the token order
+		// and step 1 hits the replay-safe path).
 		$rig = $this->makeReaction();
 
 		$rig['orders']->shouldReceive( 'findByVatlyId' )->andReturn( null );
 		$rig['getOrder']->shouldReceive( 'execute' )->andThrow( new \RuntimeException( 'API down' ) );
+		$rig['bindings']->shouldReceive( 'hostCustomerIdFor' )->andReturn( '7' );
 
+		// At least one pending token order for this user.
+		global $wpdb;
+		$wpdb->next_var = 1;
+
+		// store() must NOT be called.
+		$rig['orders']->shouldNotReceive( 'store' );
+		$rig['bindings']->shouldNotReceive( 'record' );
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessageMatches( '/Cannot route order\.paid .* safely/' );
+
+		$rig['reaction']->handle( $this->orderPaid() );
+	}
+
+	public function test_getOrder_failure_inserts_when_user_has_no_pending_tokens(): void {
+		// User has no token orders pending → this can only be a renewal →
+		// safe to INSERT. (Vatly doesn't propagate checkout metadata onto
+		// renewal orders, so GetOrder failure on a renewal is indistinguishable
+		// from a renewal we couldn't enrich; both end up here.)
+		$rig = $this->makeReaction();
+
+		$rig['orders']->shouldReceive( 'findByVatlyId' )->andReturn( null );
+		$rig['getOrder']->shouldReceive( 'execute' )->andThrow( new \RuntimeException( 'API down' ) );
+		$rig['bindings']->shouldReceive( 'hostCustomerIdFor' )->andReturn( '7' );
+
+		// Zero pending token orders.
+		global $wpdb;
+		$wpdb->next_var = 0;
+
+		$rig['bindings']->shouldReceive( 'record' )->once();
+		$rig['orders']->shouldReceive( 'store' )->once();
+
+		$rig['reaction']->handle( $this->orderPaid() );
+
+		$this->assertHookExpectations();
+	}
+
+	public function test_getOrder_failure_inserts_when_no_user_binding(): void {
+		// No host binding at all — there can't be a PMPro token order
+		// waiting for reconciliation, so INSERT is safe.
+		$rig = $this->makeReaction();
+
+		$rig['orders']->shouldReceive( 'findByVatlyId' )->andReturn( null );
+		$rig['getOrder']->shouldReceive( 'execute' )->andThrow( new \RuntimeException( 'API down' ) );
 		$rig['bindings']->shouldReceive( 'hostCustomerIdFor' )->andReturn( null );
-		$rig['bindings']->shouldReceive( 'record' );
 
+		$rig['bindings']->shouldReceive( 'record' )->once();
 		$rig['orders']->shouldReceive( 'store' )->once();
 
 		$rig['reaction']->handle( $this->orderPaid() );

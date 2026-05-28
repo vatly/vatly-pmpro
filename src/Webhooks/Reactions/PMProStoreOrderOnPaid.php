@@ -22,16 +22,22 @@ use Vatly\PMPro\Repositories\OrderRepository;
  * has multiple open checkouts in different tabs.
  *
  * Flow:
- *   1. Existing order at this Vatly id?  → UPDATE (replay-safe).
- *   2. Pull `pmpro_order_code` from the order metadata.
- *   3. PMPro order with that code in `token` status?  → convert in place.
- *   4. Otherwise (renewal / no metadata)  → INSERT.
+ *   1. Existing order at this Vatly id?               → UPDATE (replay-safe).
+ *   2. Pull `pmpro_order_code` from order metadata.
+ *      → PMPro token order with that code?            → convert in place.
+ *      → metadata succeeded but no pmpro_order_code   → renewal: INSERT.
+ *   3. `GetOrder` failed (transient API error):
+ *      → user has unmatched token orders pending      → THROW (retry-safe).
+ *      → user has no pending tokens                   → renewal: INSERT.
+ *      → no user binding at all                       → renewal: INSERT.
  *
- * The metadata is set when we create the Vatly checkout. Vatly propagates it
- * onto the resulting order (it does not propagate onto *renewal* orders, by
- * design — those legitimately have no PMPro counterpart yet), so this routing
- * is precise for initial purchases and naturally falls through to INSERT for
- * recurring billing.
+ * The "throw on ambiguous failure" branch matters: if we INSERT on a metadata
+ * fetch failure for what might be an initial purchase, the user's eventual
+ * browser-return would then convert the original token order — leaving two
+ * `pmpro_membership_orders` rows for one Vatly payment. Throwing yields a 500
+ * back to Vatly, which retries the webhook; by then `GetOrder` will likely
+ * succeed, or the browser-return will have reconciled the token order first
+ * (in which case the retry hits the replay-safe path at step 1).
  *
  * fluent's `OrderPaid` event doesn't currently expose order metadata, so we
  * re-fetch via {@see GetOrder}. It's the same call fluent already makes during
@@ -64,15 +70,110 @@ class PMProStoreOrderOnPaid implements WebhookReactionInterface {
 			return;
 		}
 
-		// 2 + 3. Precise routing via metadata.pmpro_order_code.
-		$pmpro_order_code = $this->fetch_pmpro_order_code( $event->orderId );
+		// 2. Precise routing via metadata.pmpro_order_code.
+		try {
+			$pmpro_order_code = $this->fetch_pmpro_order_code( $event->orderId );
+		} catch ( \Throwable $e ) {
+			// 3. Metadata fetch failed. Pick a safe failure mode.
+			$this->handle_metadata_unavailable( $event, $e );
+
+			return;
+		}
 
 		if ( $pmpro_order_code !== null && $this->convert_token_by_code( $pmpro_order_code, $event ) ) {
 			return;
 		}
 
-		// 4. Fall through: renewal / no metadata. fluent's StoreOrderOnPaid
-		// equivalent — just INSERT via the repository.
+		// 2b. Metadata succeeded but had no `pmpro_order_code` — that's a
+		// genuine renewal (Vatly doesn't propagate checkout metadata onto
+		// recurring orders). INSERT.
+		$this->insert_event( $event );
+	}
+
+	/**
+	 * Pull `pmpro_order_code` from the Vatly order's metadata. Throws when
+	 * `GetOrder` fails (so callers can distinguish between "API unavailable"
+	 * and "metadata absent"). Returns null when the call succeeds but the
+	 * field is missing or empty.
+	 */
+	private function fetch_pmpro_order_code( string $vatly_order_id ): ?string {
+		$api_order = $this->getOrder->execute( $vatly_order_id );
+
+		$metadata = (array) ( $api_order->metadata ?? [] );
+		$code     = $metadata['pmpro_order_code'] ?? null;
+
+		if ( ! is_string( $code ) || $code === '' ) {
+			return null;
+		}
+
+		return $code;
+	}
+
+	/**
+	 * Decide the safe action when `GetOrder` failed and we therefore can't
+	 * tell whether this is an initial purchase or a renewal.
+	 *
+	 * - If the bound user has *any* recent unmatched token order, we can't
+	 *   safely route — throw so Vatly retries (or, if the user has already
+	 *   returned via the browser before the retry, step 1 above hits).
+	 * - If the user has no pending tokens, this can only be a renewal —
+	 *   INSERT is safe.
+	 * - No binding at all → also can only be a renewal — INSERT.
+	 */
+	private function handle_metadata_unavailable( OrderPaid $event, \Throwable $cause ): void {
+		$host_id = $this->bindings->hostCustomerIdFor( $event->customerId );
+
+		if ( $host_id === null ) {
+			$this->insert_event( $event );
+
+			return;
+		}
+
+		if ( $this->has_pending_token_orders( (int) $host_id ) ) {
+			throw new \RuntimeException(
+				sprintf(
+					'Cannot route order.paid %s safely: GetOrder failed and user %d has unmatched token order(s). Retry will resolve. Underlying error: %s',
+					$event->orderId,
+					(int) $host_id,
+					$cause->getMessage()
+				),
+				0,
+				$cause
+			);
+		}
+
+		$this->insert_event( $event );
+	}
+
+	/**
+	 * Does the bound user have a token-status Vatly order that hasn't yet
+	 * been paired with a Vatly order id? If yes, an arriving `order.paid`
+	 * webhook might belong to it — we can't tell without metadata.
+	 */
+	private function has_pending_token_orders( int $user_id ): bool {
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		global $wpdb;
+
+		$count = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}pmpro_membership_orders
+					WHERE user_id = %d
+					  AND gateway = %s
+					  AND status = 'token'
+					  AND ( payment_transaction_id IS NULL OR payment_transaction_id = '' )
+					  AND timestamp > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)",
+				$user_id,
+				OrderRepository::GATEWAY
+			)
+		);
+
+		return ( (int) $count ) > 0;
+	}
+
+	private function insert_event( OrderPaid $event ): void {
 		$host_customer_id = $this->bindings->hostCustomerIdFor( $event->customerId );
 		$this->bindings->record( $event->customerId );
 
@@ -88,30 +189,6 @@ class PMProStoreOrderOnPaid implements WebhookReactionInterface {
 			taxSummary: $event->taxSummary,
 			hostCustomerId: $host_customer_id,
 		) );
-	}
-
-	/**
-	 * Pull `pmpro_order_code` from the Vatly order's metadata. Returns null
-	 * when the order has no metadata (renewals) or when the field is empty.
-	 */
-	private function fetch_pmpro_order_code( string $vatly_order_id ): ?string {
-		try {
-			$api_order = $this->getOrder->execute( $vatly_order_id );
-		} catch ( \Throwable $e ) {
-			// Stay graceful: if we can't fetch metadata, the fall-through
-			// INSERT path still works for renewals; for token orders, the
-			// browser-return path will pick them up.
-			return null;
-		}
-
-		$metadata = (array) ( $api_order->metadata ?? [] );
-		$code     = $metadata['pmpro_order_code'] ?? null;
-
-		if ( ! is_string( $code ) || $code === '' ) {
-			return null;
-		}
-
-		return $code;
 	}
 
 	/**
