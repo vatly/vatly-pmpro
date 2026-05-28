@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Repositories;
 
-use Vatly\Fluent\Contracts\BillableInterface;
-use Vatly\Fluent\Contracts\CustomerRepositoryInterface;
 use Vatly\Fluent\Contracts\OrderInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Data\StoreOrderData;
@@ -13,24 +11,25 @@ use Vatly\Fluent\Data\UpdateOrderData;
 use Vatly\Fluent\Types\TaxSummary;
 
 /**
- * Backs the fluent OrderRepository contract with PMPro's
- * `pmpro_membership_orders` table.
+ * Backs the fluent {@see OrderRepositoryInterface} contract (v0.8) with
+ * PMPro's `pmpro_membership_orders` table.
  *
  * Convention:
  * - `gateway` column = 'vatly'
  * - `payment_transaction_id` = Vatly order id
- * - `subscription_transaction_id` = Vatly subscription id (if any)
+ * - `subscription_transaction_id` = Vatly subscription id (if any, stamped by
+ *   `WriteOrderRowOnPaid` after this repo has written the order row)
  *
  * Fluent represents money in cents (int); PMPro stores decimals in DB columns.
  * Conversions live in this repository so callers never need to think about it.
+ *
+ * fluent v0.8 supplies the host customer id (PMPro user id, as a string) on
+ * the `StoreOrderData` DTO. We use it both to populate `user_id` on the row
+ * and as the lookup key for the async-checkout duplicate-protection guard.
  */
 class OrderRepository implements OrderRepositoryInterface {
 
 	public const GATEWAY = 'vatly';
-
-	public function __construct(
-		private CustomerRepositoryInterface $customers,
-	) {}
 
 	public function findByVatlyId( string $vatlyId ): ?OrderInterface {
 		global $wpdb;
@@ -52,35 +51,10 @@ class OrderRepository implements OrderRepositoryInterface {
 		return $this->hydrate( $row );
 	}
 
-	/**
-	 * @return OrderInterface[]
-	 */
-	public function findAllByOwner( BillableInterface $owner ): array {
-		global $wpdb;
-
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}pmpro_membership_orders
-					WHERE gateway = %s AND user_id = %d
-					ORDER BY id DESC",
-				self::GATEWAY,
-				(int) $owner->getKey()
-			)
-		);
-
-		return array_map( fn( $row ) => $this->hydrate( $row, $owner ), $rows ?: [] );
-	}
-
 	public function store( StoreOrderData $data ): OrderInterface {
 		global $wpdb;
 
-		$owner = $this->customers->findByVatlyId( $data->customerId );
-
-		if ( $owner === null ) {
-			throw new \RuntimeException(
-				"No WordPress user is linked to Vatly customer {$data->customerId}; cannot create order."
-			);
-		}
+		$user_id = (int) ( $data->hostCustomerId ?? 0 );
 
 		// Vatly events store amounts in minor units. PMPro stores decimals.
 		$total    = $this->cents_to_decimal( $data->total, $data->currency );
@@ -100,7 +74,7 @@ class OrderRepository implements OrderRepositoryInterface {
 		// Look for a fresh token order belonging to this user that we should
 		// convert in place instead. The 24-hour window covers normal user
 		// completion while keeping us off any abandoned token from earlier.
-		$pending_id = $this->find_pending_token_order_id( (int) $owner->getKey() );
+		$pending_id = $this->find_pending_token_order_id( $user_id );
 
 		if ( $pending_id !== null ) {
 			$status = $data->status === 'paid' ? 'success' : $data->status;
@@ -122,7 +96,7 @@ class OrderRepository implements OrderRepositoryInterface {
 				[ '%d' ]
 			);
 
-			return $this->find_by_id( $pending_id, $owner );
+			return $this->find_by_id( $pending_id );
 		}
 
 		$code = $this->random_code();
@@ -131,8 +105,8 @@ class OrderRepository implements OrderRepositoryInterface {
 			"{$wpdb->prefix}pmpro_membership_orders",
 			[
 				'code'                        => $code,
-				'user_id'                     => (int) $owner->getKey(),
-				'membership_id'               => $this->level_id_for_user( (int) $owner->getKey() ),
+				'user_id'                     => $user_id,
+				'membership_id'               => $this->level_id_for_user( $user_id ),
 				'gateway'                     => self::GATEWAY,
 				'gateway_environment'         => $this->gateway_environment(),
 				'payment_transaction_id'      => $data->vatlyId,
@@ -171,7 +145,7 @@ class OrderRepository implements OrderRepositoryInterface {
 			]
 		);
 
-		return $this->find_by_id( (int) $wpdb->insert_id, $owner );
+		return $this->find_by_id( (int) $wpdb->insert_id );
 	}
 
 	public function update( OrderInterface $order, UpdateOrderData $data ): OrderInterface {
@@ -231,20 +205,14 @@ class OrderRepository implements OrderRepositoryInterface {
 			);
 		}
 
-		return $this->find_by_id( $order->id, $order->owner );
+		return $this->find_by_id( $order->id );
 	}
 
 	/**
 	 * @param  object|array<string, mixed> $row
 	 */
-	private function hydrate( $row, ?BillableInterface $owner = null ): OrderModel {
+	private function hydrate( $row ): OrderModel {
 		$row = (array) $row;
-
-		if ( $owner === null ) {
-			$user_id = (int) ( $row['user_id'] ?? 0 );
-			$user    = $user_id > 0 ? get_user_by( 'id', $user_id ) : false;
-			$owner   = $user ? new UserBillable( $user ) : null;
-		}
 
 		$notes                         = (string) ( $row['notes'] ?? '' );
 		[ $invoice_number, $currency ] = $this->parse_notes( $notes );
@@ -265,9 +233,8 @@ class OrderRepository implements OrderRepositoryInterface {
 			tax: $tax,
 			currency: $currency,
 			invoiceNumber: $invoice_number,
-			paymentMethod: (string) ( $row['payment_type'] ?? '' ) ?: null,
+			paymentMethod: ( $row['payment_type'] ?? '' ) ?: null,
 			subscriptionTransactionId: ( $row['subscription_transaction_id'] ?? '' ) ?: null,
-			owner: $owner,
 		);
 	}
 
@@ -302,7 +269,7 @@ class OrderRepository implements OrderRepositoryInterface {
 		return $id ? (int) $id : null;
 	}
 
-	private function find_by_id( int $id, ?BillableInterface $owner ): OrderModel {
+	private function find_by_id( int $id ): OrderModel {
 		global $wpdb;
 
 		$row = $wpdb->get_row(
@@ -316,7 +283,7 @@ class OrderRepository implements OrderRepositoryInterface {
 			throw new \RuntimeException( "pmpro_membership_orders row #{$id} disappeared between write and read." );
 		}
 
-		return $this->hydrate( $row, $owner );
+		return $this->hydrate( $row );
 	}
 
 	private function tax_total( ?TaxSummary $summary ): int {

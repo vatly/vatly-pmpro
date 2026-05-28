@@ -79,10 +79,4 @@ class Configuration implements ConfigurationInterface {
 
 		return home_url( '/' );
 	}
-
-	public function getBillableModel(): string {
-		// Not used by the PMPro driver — repositories resolve users by WP_User
-		// directly. Return the WP_User class so phpstan stays happy.
-		return \WP_User::class;
-	}
 }

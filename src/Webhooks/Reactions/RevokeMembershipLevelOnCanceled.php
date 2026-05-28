@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Webhooks\Reactions;
 
-use Vatly\Fluent\Contracts\CustomerRepositoryInterface;
+use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
 use Vatly\Fluent\Events\SubscriptionCanceledImmediately;
 use Vatly\Fluent\Events\SubscriptionCanceledWithGracePeriod;
@@ -14,14 +14,15 @@ use Vatly\Fluent\Events\SubscriptionCanceledWithGracePeriod;
  * subscription cancellation.
  *
  * - `subscription.canceled_immediately`: revoke now.
- * - `subscription.canceled_with_grace_period`: store the grace end date on the
- *   subscription row (handled by fluent's built-in CancelSubscriptionOnCanceled
- *   reaction) and rely on PMPro's expiration cron to revoke at grace end.
+ * - `subscription.canceled_with_grace_period`: store the grace end date on
+ *   the subscription row (handled by fluent's built-in
+ *   `CancelSubscriptionOnCanceled` reaction) and rely on PMPro's expiration
+ *   cron to revoke at grace end.
  */
 class RevokeMembershipLevelOnCanceled implements WebhookReactionInterface {
 
 	public function __construct(
-		private CustomerRepositoryInterface $customers,
+		private CustomerBindingRepository $bindings,
 	) {}
 
 	public function supports( object $event ): bool {
@@ -42,15 +43,20 @@ class RevokeMembershipLevelOnCanceled implements WebhookReactionInterface {
 			return;
 		}
 
-		$user_billable = $this->customers->findByVatlyId( $event->customerId );
+		$host_id = $this->bindings->hostCustomerIdFor( $event->customerId );
 
-		if ( $user_billable === null ) {
+		if ( $host_id === null ) {
+			return;
+		}
+
+		$user_id = (int) $host_id;
+		if ( $user_id <= 0 ) {
 			return;
 		}
 
 		if ( function_exists( 'pmpro_changeMembershipLevel' ) ) {
 			// Passing 0 cancels all of the user's memberships.
-			pmpro_changeMembershipLevel( 0, (int) $user_billable->getKey(), 'cancelled' );
+			pmpro_changeMembershipLevel( 0, $user_id, 'cancelled' );
 		}
 	}
 }

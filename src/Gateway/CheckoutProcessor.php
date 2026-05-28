@@ -8,37 +8,28 @@ use Vatly\API\Resources\Checkout as ApiCheckout;
 use Vatly\Fluent\Actions\CancelSubscription;
 use Vatly\Fluent\Actions\GetCheckout;
 use Vatly\Fluent\Actions\GetSubscription;
-use Vatly\Fluent\BillableFactory;
+// CancelSubscription / GetSubscription used via $container->get() below.
+use Vatly\Fluent\Contracts\CustomerBindingRepository;
+use Vatly\Fluent\CustomerProfile;
+use Vatly\Fluent\Exceptions\CustomerAlreadyBoundException;
+use Vatly\Fluent\Vatly;
 use Vatly\PMPro\Container;
-use Vatly\PMPro\Repositories\CustomerRepository;
 use Vatly\PMPro\Repositories\SubscriptionRepository;
 
 /**
  * Where the actual checkout / cancel / sync work happens for the Vatly
  * gateway driver. Kept stateless and DI-friendly so the gateway class itself
  * stays a thin shim.
+ *
+ * Migrated to fluent v0.8 — uses {@see Vatly} as the composition root, the
+ * {@see CustomerProfile} value object for customer payloads, and the
+ * driver-supplied {@see CustomerBindingRepository} for host ↔ Vatly customer
+ * lookups.
  */
 final class CheckoutProcessor {
 
 	public const ORDER_META_CHECKOUT_ID = 'vatly_checkout_id';
 
-	/**
-	 * Drive the order through the Vatly hosted-checkout flow.
-	 *
-	 * Phase 1 (no checkout id on the order):
-	 *  - Resolve/create the user's Vatly customer.
-	 *  - Build a Vatly checkout for the membership level's mapped plan.
-	 *  - Persist the checkout id on the order, set status=token, save.
-	 *  - wp_redirect() to Vatly's hosted checkout. Halts execution.
-	 *
-	 * Phase 2 (return from Vatly, checkout id present):
-	 *  - Fetch the checkout from Vatly.
-	 *  - If it's `paid`, flip the order to `success` and return true so
-	 *    PMPro proceeds with level assignment.
-	 *  - If it's `expired` or `canceled`, set an error.
-	 *  - Otherwise, keep status=token and return true so the user sees a
-	 *    "pending" confirmation page — the webhook will catch up.
-	 */
 	public static function process( Container $container, $order ): bool {
 		$checkout_id = self::get_existing_checkout_id( $order );
 
@@ -65,23 +56,10 @@ final class CheckoutProcessor {
 			return false;
 		}
 
-		/** @var CustomerRepository $customers */
-		$customers = $container->get( \Vatly\Fluent\Contracts\CustomerRepositoryInterface::class );
-		/** @var BillableFactory $factory */
-		$factory = $container->get( BillableFactory::class );
-
-		$billable_user = $customers->forUser( $user );
-		$billable      = $factory->forOwner( $billable_user );
-
-		// Make sure the Vatly customer exists (idempotent).
-		$billable->createOrGetVatlyCustomer(
-			array_filter(
-				[
-					'email' => $user->user_email,
-					'name'  => trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name,
-				]
-			)
-		);
+		/** @var Vatly $vatly */
+		$vatly = $container->get( Vatly::class );
+		/** @var CustomerBindingRepository $bindings */
+		$bindings = $container->get( CustomerBindingRepository::class );
 
 		$plan_id = self::plan_id_for_level( (int) $order->membership_id );
 
@@ -90,6 +68,35 @@ final class CheckoutProcessor {
 			$order->shorterror = $order->error;
 
 			return false;
+		}
+
+		// Resolve (or create + bind) the Vatly customer for this WP user.
+		$host_customer_id  = (string) $user->ID;
+		$vatly_customer_id = $bindings->vatlyCustomerIdFor( $host_customer_id );
+
+		$profile = new CustomerProfile(
+			vatlyId: $vatly_customer_id,
+			email: $user->user_email ?: null,
+			name: trim( $user->first_name . ' ' . $user->last_name ) ?: ( $user->display_name ?: null ),
+		);
+
+		if ( $vatly_customer_id === null ) {
+			try {
+				$customer          = $vatly->customers()->createFor( $host_customer_id, $profile );
+				$vatly_customer_id = $customer->id;
+				$profile           = new CustomerProfile( vatlyId: $customer->id, email: $profile->email, name: $profile->name );
+			} catch ( CustomerAlreadyBoundException $e ) {
+				// Race against another concurrent checkout — pick up the
+				// already-bound id and keep going.
+				$vatly_customer_id = $bindings->vatlyCustomerIdFor( $host_customer_id );
+				if ( $vatly_customer_id === null ) {
+					$order->error      = __( 'Could not link your Vatly customer record. Please try again.', 'vatly-pmpro' );
+					$order->shorterror = __( 'Customer link failed.', 'vatly-pmpro' );
+
+					return false;
+				}
+				$profile = new CustomerProfile( vatlyId: $vatly_customer_id, email: $profile->email, name: $profile->name );
+			}
 		}
 
 		// Save the PMPro order early so we have a code to round-trip with.
@@ -116,22 +123,21 @@ final class CheckoutProcessor {
 			pmpro_url( 'levels' )
 		);
 
-		$checkout = $billable
-			->subscribe()
+		$checkout = $vatly
+			->subscriptionBuilder( $profile )
 			->toPlan( $plan_id )
 			->withRedirectUrlSuccess( $return_url )
 			->withRedirectUrlCanceled( $cancel_url )
 			->create(
 				[
 					'metadata' => [
-						'pmpro_order_code'    => $order->code,
-						'pmpro_level_id'      => (int) $order->membership_id,
-						'wp_user_id'          => (int) $user->ID,
+						'pmpro_order_code' => $order->code,
+						'pmpro_level_id'   => (int) $order->membership_id,
+						'wp_user_id'       => (int) $user->ID,
 					],
 				]
 			);
 
-		// Persist Vatly's checkout id on the order via order meta.
 		self::set_existing_checkout_id( $order, $checkout->id );
 
 		$href = self::checkout_href( $checkout );
@@ -154,8 +160,6 @@ final class CheckoutProcessor {
 		try {
 			$checkout = $action->execute( $checkout_id );
 		} catch ( \Throwable $e ) {
-			// API failed — let PMPro keep the token-status order; webhook will
-			// catch up. Show a friendly message to the user.
 			$order->error      = __( "We couldn't confirm your payment with Vatly just yet. We'll keep checking — refresh in a moment.", 'vatly-pmpro' );
 			$order->shorterror = __( 'Awaiting Vatly confirmation.', 'vatly-pmpro' );
 
@@ -184,11 +188,7 @@ final class CheckoutProcessor {
 		// Still pending. CRITICAL: return false here, not true. PMPro's
 		// checkout preheader does `$pmpro_confirmed = true` whenever process()
 		// returns truthy, then calls pmpro_complete_checkout() which assigns
-		// the membership level — before Vatly has confirmed payment. Returning
-		// false keeps the order in `token` status and surfaces the message
-		// below to the user. The webhook will independently assign the level
-		// via AssignMembershipLevelOnStarted when it arrives; the user can
-		// refresh and process() will re-check Vatly and complete normally.
+		// the membership level — before Vatly has confirmed payment.
 		$order->error      = __( "Your Vatly payment is still being confirmed. Please refresh this page in a moment — we'll complete your membership as soon as the payment settles.", 'vatly-pmpro' );
 		$order->shorterror = __( 'Awaiting Vatly confirmation.', 'vatly-pmpro' );
 
@@ -337,8 +337,6 @@ final class CheckoutProcessor {
 			return $checkout->href;
 		}
 
-		// Newer API resources may expose the URL under `_links->checkout->href`
-		// or `url`. Defensively probe both.
 		if ( isset( $checkout->url ) && is_string( $checkout->url ) ) {
 			return (string) $checkout->url;
 		}

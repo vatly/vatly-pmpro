@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Repositories;
 
-use Vatly\Fluent\Contracts\BillableInterface;
 use Vatly\Fluent\Contracts\OrderInterface;
 
 /**
@@ -32,7 +31,6 @@ class OrderModel implements OrderInterface {
 		public ?string $invoiceNumber,
 		public ?string $paymentMethod,
 		public ?string $subscriptionTransactionId,
-		public ?BillableInterface $owner,
 	) {}
 
 	public function getVatlyId(): string {
@@ -57,16 +55,6 @@ class OrderModel implements OrderInterface {
 
 	public function getPaymentMethod(): ?string {
 		return $this->paymentMethod;
-	}
-
-	public function getOwner(): BillableInterface {
-		if ( $this->owner === null ) {
-			throw new \LogicException(
-				'OrderModel was constructed without an owner. Use OrderRepository::findByVatlyId().'
-			);
-		}
-
-		return $this->owner;
 	}
 
 	public function isPaid(): bool {

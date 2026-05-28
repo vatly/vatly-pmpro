@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Webhooks\Reactions;
 
-use Vatly\Fluent\Contracts\CustomerRepositoryInterface;
+use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
 use Vatly\Fluent\Events\SubscriptionStarted;
 use Vatly\PMPro\Repositories\SubscriptionRepository;
 
 /**
- * On `subscription.started`, assign the matching PMPro membership level to the
- * user. The level→plan mapping is configured on each PMPro level via the
- * `pmpro_vatly_plan_id` level meta (see Admin\LevelOptions).
+ * On `subscription.started`, assign the matching PMPro membership level to
+ * the user bound to the Vatly customer in the event. The level→plan mapping
+ * is configured on each PMPro level via the `pmpro_vatly_plan_id` level
+ * meta (see {@see \Vatly\PMPro\Admin\LevelOptions}).
  *
- * Idempotent: PMPro's `pmpro_changeMembershipLevel` is no-op if the user is
- * already on the level.
+ * Idempotent: PMPro's `pmpro_changeMembershipLevel()` is a no-op if the
+ * user is already on the level.
  */
 class AssignMembershipLevelOnStarted implements WebhookReactionInterface {
 
 	public function __construct(
-		private CustomerRepositoryInterface $customers,
+		private CustomerBindingRepository $bindings,
 	) {}
 
 	public function supports( object $event ): bool {
@@ -32,14 +33,19 @@ class AssignMembershipLevelOnStarted implements WebhookReactionInterface {
 			return;
 		}
 
-		$user_billable = $this->customers->findByVatlyId( $event->customerId );
+		$host_id = $this->bindings->hostCustomerIdFor( $event->customerId );
 
-		if ( $user_billable === null ) {
-			// Customer not yet linked to a WordPress user — this can happen if
-			// the webhook arrives before the user returns from the hosted
+		if ( $host_id === null ) {
+			// Customer not yet linked to a WordPress user — this can happen
+			// if the webhook arrives before the user returns from the hosted
 			// checkout. The subscription row will be created by the fluent
 			// built-in SyncSubscriptionOnStarted reaction either way, and we
 			// can retroactively assign the level on the next event.
+			return;
+		}
+
+		$user_id = (int) $host_id;
+		if ( $user_id <= 0 ) {
 			return;
 		}
 
@@ -56,7 +62,7 @@ class AssignMembershipLevelOnStarted implements WebhookReactionInterface {
 		}
 
 		if ( function_exists( 'pmpro_changeMembershipLevel' ) ) {
-			pmpro_changeMembershipLevel( $level_id, (int) $user_billable->getKey(), 'changed' );
+			pmpro_changeMembershipLevel( $level_id, $user_id, 'changed' );
 		}
 	}
 

@@ -5,34 +5,29 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Repositories;
 
 use DateTimeImmutable;
-use DateTimeInterface;
-use Vatly\Fluent\Contracts\BillableInterface;
-use Vatly\Fluent\Contracts\CustomerRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Data\StoreSubscriptionData;
 use Vatly\Fluent\Data\UpdateSubscriptionData;
 
 /**
- * Backs the fluent SubscriptionRepository contract with PMPro's
- * `pmpro_subscriptions` table.
+ * Backs the fluent {@see SubscriptionRepositoryInterface} contract (v0.8)
+ * with PMPro's `pmpro_subscriptions` table.
  *
  * Convention:
  * - `gateway` column = 'vatly'
  * - `subscription_transaction_id` column = Vatly subscription id
- * - level → plan mapping stored as level meta (pmpro_vatly_plan_id) — looked up
- *   in reverse here to derive membership_level_id from a Vatly plan id when
- *   storing a new subscription.
+ * - level → plan mapping stored as level meta (`pmpro_vatly_plan_id`); we do
+ *   the reverse lookup here to populate `membership_level_id` when storing.
+ *
+ * fluent v0.8 supplies the host customer id (PMPro user id, as a string) on
+ * the `StoreSubscriptionData` DTO — no more host-side lookup inside the repo.
  */
 class SubscriptionRepository implements SubscriptionRepositoryInterface {
 
 	public const GATEWAY = 'vatly';
 
 	public const LEVEL_META_PLAN_ID = 'pmpro_vatly_plan_id';
-
-	public function __construct(
-		private CustomerRepositoryInterface $customers,
-	) {}
 
 	public function findByVatlyId( string $vatlyId ): ?SubscriptionInterface {
 		global $wpdb;
@@ -54,71 +49,20 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 		return $this->hydrate( $row );
 	}
 
-	public function findByOwnerAndType( BillableInterface $owner, string $type ): ?SubscriptionInterface {
-		global $wpdb;
-
-		$user_id = (int) $owner->getKey();
-
-		$row = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}pmpro_subscriptions
-					WHERE gateway = %s AND user_id = %d
-					ORDER BY (status = 'active') DESC, id DESC
-					LIMIT 1",
-				self::GATEWAY,
-				$user_id
-			)
-		);
-
-		if ( ! $row ) {
-			return null;
-		}
-
-		return $this->hydrate( $row, $owner );
-	}
-
-	/**
-	 * @return SubscriptionInterface[]
-	 */
-	public function findAllByOwner( BillableInterface $owner ): array {
-		global $wpdb;
-
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}pmpro_subscriptions
-					WHERE gateway = %s AND user_id = %d
-					ORDER BY id DESC",
-				self::GATEWAY,
-				(int) $owner->getKey()
-			)
-		);
-
-		return array_map( fn( $row ) => $this->hydrate( $row, $owner ), $rows ?: [] );
-	}
-
-	public function ownerHasActiveSubscription( BillableInterface $owner, string $type ): bool {
-		$subscription = $this->findByOwnerAndType( $owner, $type );
-
-		return $subscription !== null && $subscription->isActive();
-	}
-
 	public function store( StoreSubscriptionData $data ): SubscriptionInterface {
 		global $wpdb;
 
-		$owner = $this->customers->findByVatlyId( $data->customerId );
-
-		if ( $owner === null ) {
-			throw new \RuntimeException(
-				"No WordPress user is linked to Vatly customer {$data->customerId}; cannot create subscription."
-			);
-		}
+		$user_id = (int) ( $data->hostCustomerId ?? 0 );
+		// Anonymous subscriptions can technically exist at Vatly; on PMPro
+		// they're effectively useless until a user gets bound, but we still
+		// persist a row so we can correlate when the binding lands.
 
 		$level_id = $this->level_id_for_plan( $data->planId );
 
 		$wpdb->insert(
 			"{$wpdb->prefix}pmpro_subscriptions",
 			[
-				'user_id'                     => (int) $owner->getKey(),
+				'user_id'                     => $user_id,
 				'membership_level_id'         => $level_id,
 				'gateway'                     => self::GATEWAY,
 				'gateway_environment'         => $this->gateway_environment(),
@@ -130,9 +74,7 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			[ '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' ]
 		);
 
-		$id = (int) $wpdb->insert_id;
-
-		return $this->find_by_id( $id, $owner );
+		return $this->find_by_id( (int) $wpdb->insert_id );
 	}
 
 	public function update( SubscriptionInterface $subscription, UpdateSubscriptionData $data ): SubscriptionInterface {
@@ -172,22 +114,14 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			);
 		}
 
-		return $this->find_by_id( $subscription->id, $subscription->owner );
+		return $this->find_by_id( $subscription->id );
 	}
 
 	/**
-	 * Hydrate a `pmpro_subscriptions` row to SubscriptionModel.
-	 *
 	 * @param  object|array<string, mixed> $row
 	 */
-	private function hydrate( $row, ?BillableInterface $owner = null ): SubscriptionModel {
+	private function hydrate( $row ): SubscriptionModel {
 		$row = (array) $row;
-
-		if ( $owner === null ) {
-			$user_id = (int) ( $row['user_id'] ?? 0 );
-			$user    = $user_id > 0 ? get_user_by( 'id', $user_id ) : false;
-			$owner   = $user ? new UserBillable( $user ) : null;
-		}
 
 		$enddate = $row['enddate'] ?? null;
 		if ( $enddate === '0000-00-00 00:00:00' || $enddate === null || $enddate === '' ) {
@@ -212,11 +146,10 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			quantity: 1,
 			status: (string) ( $row['status'] ?? 'active' ),
 			endsAt: $ends_at,
-			owner: $owner,
 		);
 	}
 
-	private function find_by_id( int $id, ?BillableInterface $owner ): SubscriptionModel {
+	private function find_by_id( int $id ): SubscriptionModel {
 		global $wpdb;
 
 		$row = $wpdb->get_row(
@@ -230,7 +163,7 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			throw new \RuntimeException( "pmpro_subscriptions row #{$id} disappeared between write and read." );
 		}
 
-		return $this->hydrate( $row, $owner );
+		return $this->hydrate( $row );
 	}
 
 	/**

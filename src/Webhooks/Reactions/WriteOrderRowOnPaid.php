@@ -4,33 +4,32 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Webhooks\Reactions;
 
-use Vatly\Fluent\Contracts\CustomerRepositoryInterface;
-use Vatly\Fluent\Contracts\OrderRepositoryInterface;
-use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
+use Vatly\Fluent\Contracts\CustomerBindingRepository;
+use Vatly\Fluent\Contracts\OrderReader;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
 use Vatly\Fluent\Events\OrderPaid;
 use Vatly\PMPro\Repositories\SubscriptionRepository;
 
 /**
- * Write a `success`-status row to `pmpro_membership_orders` for every paid
- * Vatly order — both initial purchases and recurring renewals — and link it to
- * the active Vatly subscription where possible.
+ * Stamps the active Vatly subscription's `subscription_transaction_id` onto
+ * the just-written `pmpro_membership_orders` row.
  *
- * The built-in `StoreOrderOnPaid` reaction in fluent already persists via the
- * OrderRepository contract; this PMPro-specific reaction runs *after* it (we
- * register it after the built-in in the WebhookProcessorFactory call) and
- * patches `subscription_transaction_id` into the newly written row so PMPro's
- * subscription→order joins work.
+ * Order of reactions: fluent's built-in {@see \Vatly\Fluent\Webhooks\Reactions\StoreOrderOnPaid}
+ * writes the row first (via our `OrderRepository::store()`, which now also
+ * handles the token→success conversion case), and our reaction runs after
+ * it to attach the subscription link — handy for `pmpro_subscriptions →
+ * pmpro_membership_orders` joins in admin views.
  *
- * Order of reactions registered: built-in StoreOrderOnPaid → this. fluent
- * iterates `$reactions` in order.
+ * Looking up the subscription by the user means we don't need fluent to
+ * expose a subscription id on the `OrderPaid` event (it doesn't); a single
+ * user has at most one active Vatly subscription in the PMPro model, so the
+ * most-recent active row wins.
  */
 class WriteOrderRowOnPaid implements WebhookReactionInterface {
 
 	public function __construct(
-		private CustomerRepositoryInterface $customers,
-		private OrderRepositoryInterface $orders,
-		private SubscriptionRepositoryInterface $subscriptions,
+		private CustomerBindingRepository $bindings,
+		private OrderReader $orders,
 	) {}
 
 	public function supports( object $event ): bool {
@@ -42,37 +41,63 @@ class WriteOrderRowOnPaid implements WebhookReactionInterface {
 			return;
 		}
 
-		// fluent's built-in StoreOrderOnPaid already wrote the row. We
-		// re-read it to find the PMPro id, then stamp the active
-		// subscription_transaction_id onto it.
+		// fluent's built-in StoreOrderOnPaid already wrote the row. Confirm
+		// it exists (otherwise there's nothing to stamp) before we go look
+		// for the subscription.
 		$order = $this->orders->findByVatlyId( $event->orderId );
 
 		if ( $order === null ) {
 			return;
 		}
 
-		$user_billable = $this->customers->findByVatlyId( $event->customerId );
+		$host_id = $this->bindings->hostCustomerIdFor( $event->customerId );
 
-		if ( $user_billable === null ) {
+		if ( $host_id === null ) {
 			return;
 		}
 
-		$subscription = $this->subscriptions->findByOwnerAndType( $user_billable, 'default' );
+		$user_id = (int) $host_id;
+		if ( $user_id <= 0 ) {
+			return;
+		}
 
-		if ( $subscription === null ) {
+		$subscription_vatly_id = $this->latest_subscription_id_for_user( $user_id );
+
+		if ( $subscription_vatly_id === null ) {
 			return;
 		}
 
 		global $wpdb;
 		$wpdb->update(
 			"{$wpdb->prefix}pmpro_membership_orders",
-			[ 'subscription_transaction_id' => $subscription->getVatlyId() ],
+			[ 'subscription_transaction_id' => $subscription_vatly_id ],
 			[
-'gateway' => SubscriptionRepository::GATEWAY,
-'payment_transaction_id' => $event->orderId,
-],
+				'gateway'                => SubscriptionRepository::GATEWAY,
+				'payment_transaction_id' => $event->orderId,
+			],
 			[ '%s' ],
 			[ '%s', '%s' ]
 		);
+	}
+
+	/**
+	 * fluent's `SubscriptionReader` only exposes `findByVatlyId()`. Look up
+	 * by user directly against the table — we know it well enough.
+	 */
+	private function latest_subscription_id_for_user( int $user_id ): ?string {
+		global $wpdb;
+
+		$id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT subscription_transaction_id FROM {$wpdb->prefix}pmpro_subscriptions
+					WHERE user_id = %d AND gateway = %s
+					ORDER BY (status = 'active') DESC, id DESC
+					LIMIT 1",
+				$user_id,
+				SubscriptionRepository::GATEWAY
+			)
+		);
+
+		return $id ? (string) $id : null;
 	}
 }

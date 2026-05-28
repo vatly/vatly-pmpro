@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Repositories;
 
-use DateTimeImmutable;
 use DateTimeInterface;
-use Vatly\Fluent\Contracts\BillableInterface;
+use Vatly\Fluent\Concerns\DerivesSubscriptionState;
 use Vatly\Fluent\Contracts\SubscriptionInterface;
 
 /**
  * Read-model wrapper around a row in `pmpro_subscriptions`.
  *
- * Stays decoupled from PMPro_Subscription — both for testability and because
- * the PMPro class is loaded too late to use in some webhook contexts. Mutations
- * go through SubscriptionRepository::update().
+ * State predicates (isCancelled/isActive/isValid/isRecurring/isEnded) are
+ * inherited from fluent's `DerivesSubscriptionState` trait — keeps semantics
+ * in sync across drivers without us reimplementing the lattice.
  */
 class SubscriptionModel implements SubscriptionInterface {
+
+	use DerivesSubscriptionState;
 
 	public const GATEWAY = 'vatly';
 
@@ -30,7 +31,6 @@ class SubscriptionModel implements SubscriptionInterface {
 		public int $quantity,
 		public string $status,
 		public ?DateTimeInterface $endsAt,
-		public ?BillableInterface $owner,
 	) {}
 
 	public function getVatlyId(): string {
@@ -55,40 +55,5 @@ class SubscriptionModel implements SubscriptionInterface {
 
 	public function getEndsAt(): ?DateTimeInterface {
 		return $this->endsAt;
-	}
-
-	public function isCancelled(): bool {
-		// PMPro statuses: active, cancelled (with grace period until enddate), error
-		if ( $this->endsAt !== null ) {
-			return true;
-		}
-
-		return in_array( $this->status, [ 'cancelled', 'canceled', 'expired' ], true );
-	}
-
-	public function isOnGracePeriod(): bool {
-		if ( $this->endsAt === null ) {
-			return false;
-		}
-
-		return $this->endsAt > new DateTimeImmutable();
-	}
-
-	public function isActive(): bool {
-		if ( ! $this->isCancelled() ) {
-			return true;
-		}
-
-		return $this->isOnGracePeriod();
-	}
-
-	public function getOwner(): BillableInterface {
-		if ( $this->owner === null ) {
-			throw new \LogicException(
-				'SubscriptionModel was constructed without an owner. Use SubscriptionRepository::findByVatlyId().'
-			);
-		}
-
-		return $this->owner;
 	}
 }
