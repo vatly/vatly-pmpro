@@ -12,8 +12,12 @@ use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
 use Vatly\Fluent\Actions\CancelSubscription;
 use Vatly\Fluent\Actions\GetCheckout;
+use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
 use Vatly\Fluent\Vatly;
+use Vatly\Fluent\Webhooks\Reactions\CancelSubscriptionOnCanceled;
+use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnStarted;
+use Vatly\Fluent\Webhooks\WebhookEventFactory;
 use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
 use Vatly\PMPro\Repositories\OrderRepository;
@@ -22,6 +26,7 @@ use Vatly\PMPro\Repositories\UserMetaCustomerBindings;
 use Vatly\PMPro\Repositories\WebhookCallRepository;
 use Vatly\PMPro\Webhooks\EventDispatcher;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
+use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
@@ -112,7 +117,9 @@ class Container {
 
 		// Wiring + Vatly facade. fluent v0.8 wants a single Wiring DTO that
 		// bundles every driver-supplied contract, and constructs Vatly once
-		// as the composition root. Everything else hangs off the facade.
+		// as the composition root. Customer-facing flows (builders, customer
+		// service) all hang off the facade. The webhook processor below is
+		// the one place we deviate — see comment there.
 		$this->set(
 			Wiring::class,
 			static fn( Container $c ): Wiring => new Wiring(
@@ -122,14 +129,6 @@ class Container {
 				webhookCalls: $c->get( WebhookCallRepositoryInterface::class ),
 				events: $c->get( EventDispatcherInterface::class ),
 				customerBindings: $c->get( CustomerBindingRepository::class ),
-				additionalWebhookReactions: [
-					new AssignMembershipLevelOnStarted( $c->get( CustomerBindingRepository::class ) ),
-					new RevokeMembershipLevelOnCanceled( $c->get( CustomerBindingRepository::class ) ),
-					new WriteOrderRowOnPaid(
-						$c->get( CustomerBindingRepository::class ),
-						$c->get( OrderRepositoryInterface::class )
-					),
-				],
 			)
 		);
 
@@ -138,12 +137,43 @@ class Container {
 			static fn( Container $c ): Vatly => new Vatly( $c->get( Wiring::class ) )
 		);
 
-		// WebhookProcessor is resolved through the facade rather than constructed
-		// directly — keeps everything aligned on fluent's intended composition
-		// shape and means we get any future processor changes for free.
+		// We construct WebhookProcessor directly rather than going through
+		// `Vatly::webhookProcessor()`. The facade hardcodes fluent's built-in
+		// `StoreOrderOnPaid`, which uses a user-keyed time-window heuristic to
+		// reconcile token orders with paid-order webhooks. That heuristic
+		// misroutes the webhook when the same member has multiple open
+		// checkouts (tab A + tab B). We replace it with our own
+		// `PMProStoreOrderOnPaid`, which uses the `pmpro_order_code` from
+		// the Vatly order's metadata for precise routing.
 		$this->set(
 			WebhookProcessor::class,
-			static fn( Container $c ): WebhookProcessor => $c->get( Vatly::class )->webhookProcessor()
+			static function ( Container $c ): WebhookProcessor {
+				$config        = $c->get( ConfigurationInterface::class );
+				$subscriptions = $c->get( SubscriptionRepositoryInterface::class );
+				$orders        = $c->get( OrderRepositoryInterface::class );
+				$bindings      = $c->get( CustomerBindingRepository::class );
+				$dispatcher    = $c->get( EventDispatcherInterface::class );
+				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
+				$get_order     = $c->get( GetOrder::class );
+
+				return new WebhookProcessor(
+					eventFactory: new WebhookEventFactory( $get_order ),
+					repository: $webhookCalls,
+					dispatcher: $dispatcher,
+					webhookSecret: $config->getWebhookSecret() ?? '',
+					reactions: [
+						// Built-in fluent reactions we keep as-is.
+						new SyncSubscriptionOnStarted( $subscriptions, $bindings, $dispatcher ),
+						new CancelSubscriptionOnCanceled( $subscriptions ),
+						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
+						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
+						// PMPro-specific level + subscription wiring.
+						new AssignMembershipLevelOnStarted( $bindings ),
+						new RevokeMembershipLevelOnCanceled( $bindings ),
+						new WriteOrderRowOnPaid( $bindings, $orders ),
+					],
+				);
+			}
 		);
 
 		// Action shortcuts. fluent exposes most via accessors on the facade,
@@ -161,6 +191,10 @@ class Container {
 		$this->set(
 			GetSubscription::class,
 			static fn( Container $c ): GetSubscription => $c->get( Vatly::class )->getSubscription()
+		);
+		$this->set(
+			GetOrder::class,
+			static fn( Container $c ): GetOrder => $c->get( Vatly::class )->getOrder()
 		);
 	}
 }

@@ -61,43 +61,10 @@ class OrderRepository implements OrderRepositoryInterface {
 		$subtotal = $this->cents_to_decimal( $data->subtotal ?? $data->total, $data->currency );
 		$tax      = $this->cents_to_decimal( $this->tax_total( $data->taxSummary ), $data->currency );
 
-		// Async-checkout duplicate protection. When the user submits the
-		// PMPro checkout form we create a `token`-status order with an empty
-		// `payment_transaction_id` (we don't have the Vatly order id yet —
-		// only a checkout id). Vatly's `order.paid` webhook then arrives with
-		// the actual order id; without this guard, fluent's StoreOrderOnPaid
-		// would INSERT a new row (findByVatlyId can't match the empty one),
-		// and the user's subsequent return-from-Vatly would update the
-		// original token row — leaving two `pmpro_membership_orders` rows
-		// for the same Vatly order.
-		//
-		// Look for a fresh token order belonging to this user that we should
-		// convert in place instead. The 24-hour window covers normal user
-		// completion while keeping us off any abandoned token from earlier.
-		$pending_id = $this->find_pending_token_order_id( $user_id );
-
-		if ( $pending_id !== null ) {
-			$status = $data->status === 'paid' ? 'success' : $data->status;
-
-			$wpdb->update(
-				"{$wpdb->prefix}pmpro_membership_orders",
-				[
-					'payment_transaction_id' => $data->vatlyId,
-					'payment_type'           => (string) ( $data->paymentMethod ?? '' ),
-					'status'                 => $status,
-					'subtotal'               => $subtotal,
-					'tax'                    => $tax,
-					'total'                  => $total,
-					'notes'                  => $this->build_notes( $data->invoiceNumber, $data->currency ),
-					'timestamp'              => current_time( 'mysql', true ),
-				],
-				[ 'id' => $pending_id ],
-				[ '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ],
-				[ '%d' ]
-			);
-
-			return $this->find_by_id( $pending_id );
-		}
+		// Token→success conversion (matching the right PMPro order via the
+		// `pmpro_order_code` we stamp into Vatly checkout metadata) is handled
+		// by `PMProStoreOrderOnPaid`. `store()` is purely the INSERT path now —
+		// reached for renewals and any caller that hasn't pre-resolved a token.
 
 		$code = $this->random_code();
 
@@ -236,37 +203,6 @@ class OrderRepository implements OrderRepositoryInterface {
 			paymentMethod: ( $row['payment_type'] ?? '' ) ?: null,
 			subscriptionTransactionId: ( $row['subscription_transaction_id'] ?? '' ) ?: null,
 		);
-	}
-
-	/**
-	 * Find a recent `token`-status Vatly order for this user, if any —
-	 * something `start_hosted_checkout()` created and that the webhook should
-	 * convert in place rather than duplicate. Returns null when no fresh
-	 * token row exists (i.e. this is a true renewal, not an initial purchase).
-	 */
-	private function find_pending_token_order_id( int $user_id ): ?int {
-		if ( $user_id === 0 ) {
-			return null;
-		}
-
-		global $wpdb;
-
-		$id = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}pmpro_membership_orders
-					WHERE user_id = %d
-					  AND gateway = %s
-					  AND status = 'token'
-					  AND ( payment_transaction_id IS NULL OR payment_transaction_id = '' )
-					  AND timestamp > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)
-					ORDER BY id DESC
-					LIMIT 1",
-				$user_id,
-				self::GATEWAY
-			)
-		);
-
-		return $id ? (int) $id : null;
 	}
 
 	private function find_by_id( int $id ): OrderModel {

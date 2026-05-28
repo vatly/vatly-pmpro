@@ -31,8 +31,6 @@ class OrderRepositoryTest extends TestCase {
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
-		// First query is the token-order lookup → no row → fall through to INSERT.
-		$wpdb->next_var = null;
 		$wpdb->next_row = [
 			'id'                          => 1,
 			'user_id'                     => 7,
@@ -64,8 +62,7 @@ class OrderRepositoryTest extends TestCase {
 
 		self::assertInstanceOf( OrderModel::class, $order );
 
-		// queries[0] is the token-order lookup; queries[1] is the INSERT.
-		$insert = $wpdb->queries[1];
+		$insert = $wpdb->queries[0];
 		self::assertSame( 'insert', $insert[0] );
 		[ $table, $data ] = $insert[1];
 		self::assertStringContainsString( 'pmpro_membership_orders', $table );
@@ -77,59 +74,12 @@ class OrderRepositoryTest extends TestCase {
 		self::assertSame( 'ord_1', $data['payment_transaction_id'] );
 	}
 
-	public function test_store_converts_existing_token_order_instead_of_inserting(): void {
-		// Scenario: webhook arrives for the same Vatly checkout that produced
-		// a token order via start_hosted_checkout(). Without the guard we'd
-		// INSERT a duplicate row.
-		Functions\when( 'get_option' )->justReturn( 'EUR' );
-		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
-
-		global $wpdb;
-		$wpdb->next_var = 99;  // find_pending_token_order_id returns id=99
-		$wpdb->next_row = [
-			'id'                          => 99,
-			'user_id'                     => 42,
-			'membership_id'               => 0,
-			'code'                        => 'TOKEN',
-			'payment_transaction_id'      => 'ord_real',
-			'status'                      => 'success',
-			'subtotal'                    => '19.00',
-			'tax'                         => '4.00',
-			'total'                       => '23.00',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
-			'payment_type'                => 'creditcard',
-			'subscription_transaction_id' => '',
-		];
-
-		( new OrderRepository() )->store( new StoreOrderData(
-			vatlyId: 'ord_real',
-			customerId: 'cus_1',
-			status: 'paid',
-			total: 2300,
-			currency: 'EUR',
-			paymentMethod: 'creditcard',
-			hostCustomerId: '42',
-		) );
-
-		$ops = array_column( $wpdb->queries, 0 );
-		self::assertContains( 'update', $ops, 'Token order should be converted in place.' );
-		self::assertNotContains( 'insert', $ops, 'No duplicate INSERT should occur.' );
-
-		$update_idx           = array_search( 'update', $ops, true );
-		[, $data, $where ]   = $wpdb->queries[ $update_idx ][1];
-		self::assertSame( [ 'id' => 99 ], $where );
-		self::assertSame( 'success', $data['status'] );
-		self::assertSame( 'ord_real', $data['payment_transaction_id'] );
-	}
-
 	public function test_store_with_no_hostCustomerId_inserts_anonymous_row(): void {
 		Functions\when( 'get_option' )->justReturn( 'EUR' );
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
-		$wpdb->next_var = null;  // no token order — host id is 0 so lookup skips
 		$wpdb->next_row = [
 			'id'                          => 5,
 			'user_id'                     => 0,
@@ -210,7 +160,6 @@ class OrderRepositoryTest extends TestCase {
 		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
-		$wpdb->next_var = null;
 		$wpdb->next_row = [
 			'id'                          => 1,
 			'user_id'                     => 1,
@@ -235,8 +184,7 @@ class OrderRepositoryTest extends TestCase {
 			hostCustomerId: '1',
 		) );
 
-		// queries[0] is the token-order lookup; queries[1] is the INSERT.
-		$insert = $wpdb->queries[1];
+		$insert = $wpdb->queries[0];
 		self::assertSame( 'insert', $insert[0] );
 		[ , $data ] = $insert[1];
 		self::assertSame( '5000', $data['total'] );
