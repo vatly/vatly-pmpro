@@ -16,6 +16,10 @@ use WP_UnitTestCase;
 class WebhookRouteTest extends WP_UnitTestCase {
 
 	private const SECRET = 'integration-test-secret-32-bytes-long-please';
+	// Fluent v0.8's Vatly composition root constructs a VatlyApiClient eagerly
+	// and validates the key format (`/^(live|test)_[\w|]{18,}$/`). The webhook
+	// flow doesn't actually call the API, but the construction has to succeed.
+	private const TEST_API_KEY = 'test_integrationXXXXXXXXX';
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -26,6 +30,8 @@ class WebhookRouteTest extends WP_UnitTestCase {
 		Activator::activate();
 
 		update_option( Configuration::OPTION_WEBHOOK_SECRET, self::SECRET );
+		update_option( Configuration::OPTION_API_KEY_TEST, self::TEST_API_KEY );
+		update_option( Configuration::OPTION_GATEWAY_ENVIRONMENT_KEY, 'sandbox' );
 
 		// Boot the plugin's REST routes against the test server. The plugin
 		// already hooked into rest_api_init during bootstrap; we just need
@@ -37,6 +43,8 @@ class WebhookRouteTest extends WP_UnitTestCase {
 
 	protected function tearDown(): void {
 		delete_option( Configuration::OPTION_WEBHOOK_SECRET );
+		delete_option( Configuration::OPTION_API_KEY_TEST );
+		delete_option( Configuration::OPTION_GATEWAY_ENVIRONMENT_KEY );
 		parent::tearDown();
 	}
 
