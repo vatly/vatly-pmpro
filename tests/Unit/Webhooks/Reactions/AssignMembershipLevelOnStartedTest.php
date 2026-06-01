@@ -32,6 +32,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 		self::assertFalse( $reaction->supports( new OrderPaid(
 			customerId: 'cus_1',
 			orderId: 'ord_1',
+			status: 'paid',
 			total: 100,
 			subtotal: 100,
 			taxSummary: TaxSummary::empty(),

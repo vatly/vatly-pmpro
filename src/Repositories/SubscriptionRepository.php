@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Repositories;
 
 use DateTimeImmutable;
+use Vatly\API\Types\Mandate;
 use Vatly\Fluent\Contracts\SubscriptionInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Data\StoreSubscriptionData;
@@ -28,6 +29,12 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 	public const GATEWAY = 'vatly';
 
 	public const LEVEL_META_PLAN_ID = 'pmpro_vatly_plan_id';
+
+	/** Subscription-meta key: payment-method category on file (`card`, `paypal`, …). */
+	public const META_MANDATE_METHOD = 'vatly_mandate_method';
+
+	/** Subscription-meta key: customer-facing masked identifier (card last-4, masked IBAN). */
+	public const META_MANDATE_MASKED_IDENTIFIER = 'vatly_mandate_masked_identifier';
 
 	public function findByVatlyId( string $vatlyId ): ?SubscriptionInterface {
 		global $wpdb;
@@ -74,7 +81,13 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			[ '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' ]
 		);
 
-		return $this->find_by_id( (int) $wpdb->insert_id );
+		$subscription_id = (int) $wpdb->insert_id;
+
+		// Persist the payment method on file so consumer-facing surfaces can
+		// render "card ending 4242" without a per-request GetSubscription call.
+		$this->write_mandate( $subscription_id, $data->mandate );
+
+		return $this->find_by_id( $subscription_id );
 	}
 
 	public function update( SubscriptionInterface $subscription, UpdateSubscriptionData $data ): SubscriptionInterface {
@@ -114,6 +127,18 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			);
 		}
 
+		// Mandate is stored as subscription meta, independent of the row
+		// columns above. A non-null mandate is an atomic replacement (both
+		// method + masked identifier); `clearMandate` removes it. A null
+		// mandate with clearMandate=false means "no change" — leave the
+		// stored mandate untouched so a transient webhook null never wipes
+		// a good value.
+		if ( $data->mandate !== null ) {
+			$this->write_mandate( $subscription->id, $data->mandate );
+		} elseif ( $data->clearMandate ) {
+			$this->write_mandate( $subscription->id, null );
+		}
+
 		return $this->find_by_id( $subscription->id );
 	}
 
@@ -136,8 +161,10 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 
 		$plan_id = $this->plan_id_for_level( (int) ( $row['membership_level_id'] ?? 0 ) );
 
+		$subscription_id = (int) ( $row['id'] ?? 0 );
+
 		return new SubscriptionModel(
-			id: (int) ( $row['id'] ?? 0 ),
+			id: $subscription_id,
 			userId: (int) ( $row['user_id'] ?? 0 ),
 			membershipLevelId: (int) ( $row['membership_level_id'] ?? 0 ),
 			vatlyId: (string) ( $row['subscription_transaction_id'] ?? '' ),
@@ -146,7 +173,51 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			quantity: 1,
 			status: (string) ( $row['status'] ?? 'active' ),
 			endsAt: $ends_at,
+			mandateMethod: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_METHOD ),
+			mandateMaskedIdentifier: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_MASKED_IDENTIFIER ),
 		);
+	}
+
+	/**
+	 * Persist (or clear) the payment method on file as subscription meta.
+	 *
+	 * A non-null Mandate writes both parts atomically; passing null removes
+	 * both keys so a card→paypal switch can't leave a stale last-4 behind.
+	 *
+	 * Guarded with function_exists(): the subscription-meta API arrived in
+	 * PMPro 3.0, and the plugin degrades gracefully (mandate simply isn't
+	 * persisted) on anything older.
+	 */
+	private function write_mandate( int $subscription_id, ?Mandate $mandate ): void {
+		if ( $subscription_id === 0 ) {
+			return;
+		}
+
+		if ( $mandate === null ) {
+			if ( function_exists( 'delete_pmpro_subscription_meta' ) ) {
+				delete_pmpro_subscription_meta( $subscription_id, self::META_MANDATE_METHOD );
+				delete_pmpro_subscription_meta( $subscription_id, self::META_MANDATE_MASKED_IDENTIFIER );
+			}
+
+			return;
+		}
+
+		if ( ! function_exists( 'update_pmpro_subscription_meta' ) ) {
+			return;
+		}
+
+		update_pmpro_subscription_meta( $subscription_id, self::META_MANDATE_METHOD, $mandate->method );
+		update_pmpro_subscription_meta( $subscription_id, self::META_MANDATE_MASKED_IDENTIFIER, $mandate->maskedIdentifier ?? '' );
+	}
+
+	private function read_mandate_meta( int $subscription_id, string $key ): ?string {
+		if ( $subscription_id === 0 || ! function_exists( 'get_pmpro_subscription_meta' ) ) {
+			return null;
+		}
+
+		$value = get_pmpro_subscription_meta( $subscription_id, $key, true );
+
+		return ( $value === '' || $value === false || $value === null ) ? null : (string) $value;
 	}
 
 	private function find_by_id( int $id ): SubscriptionModel {

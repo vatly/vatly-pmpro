@@ -199,7 +199,7 @@ These are in [Roadmap](#roadmap). Each is small.
 | PHP         | 8.1, 8.2, 8.3                          | —               |
 | WordPress   | 6.5 (minimum we claim), latest stable  | trunk           |
 | PMPro       | 3.0+                                   | —               |
-| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.1`      | —               |
+| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.11`     | —               |
 
 CI runs unit + integration suites across these on every PR.
 
@@ -211,12 +211,20 @@ Two surfaces:
   other gateway.
 - Vatly-specific events we dispatch alongside the PMPro hooks:
   `vatly_pmpro_OrderPaid`, `vatly_pmpro_SubscriptionStarted`,
+  `vatly_pmpro_SubscriptionBillingUpdated`,
   `vatly_pmpro_SubscriptionCanceledImmediately`,
   `vatly_pmpro_SubscriptionCanceledWithGracePeriod`, plus a
   `vatly_pmpro_event` catch-all. These carry full fluent event DTOs with
   tax breakdown, invoice number, payment method — handy for emitting your
   own member-facing emails or pushing into a CRM with Vatly-specific
   context PMPro doesn't carry.
+
+**Can I show the customer's payment method on file ("card ending 4242")?**
+Yes. We persist the subscription's mandate (payment-method category +
+masked identifier) as PMPro subscription meta, kept current via the
+`subscription.started` and `subscription.billing_updated` webhooks — so a
+billing portal can read `getMandateMethod()` / `getMandateMaskedIdentifier()`
+off the subscription without a per-request Vatly API call.
 
 ## Local development
 

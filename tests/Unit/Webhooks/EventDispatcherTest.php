@@ -19,6 +19,7 @@ class EventDispatcherTest extends TestCase {
 		$event = new OrderPaid(
 			customerId: 'cus_1',
 			orderId: 'ord_1',
+			status: 'paid',
 			total: 1000,
 			subtotal: 800,
 			taxSummary: TaxSummary::empty(),

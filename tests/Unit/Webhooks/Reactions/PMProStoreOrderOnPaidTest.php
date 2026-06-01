@@ -237,6 +237,7 @@ class PMProStoreOrderOnPaidTest extends TestCase {
 		return new OrderPaid(
 			customerId: 'cus_1',
 			orderId: $orderId,
+			status: 'paid',
 			total: 100,
 			subtotal: 100,
 			taxSummary: TaxSummary::empty(),

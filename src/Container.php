@@ -16,6 +16,7 @@ use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
 use Vatly\Fluent\Vatly;
 use Vatly\Fluent\Webhooks\Reactions\CancelSubscriptionOnCanceled;
+use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnBillingUpdated;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnStarted;
 use Vatly\Fluent\Webhooks\WebhookEventFactory;
 use Vatly\Fluent\Webhooks\WebhookProcessor;
@@ -148,22 +149,32 @@ class Container {
 		$this->set(
 			WebhookProcessor::class,
 			static function ( Container $c ): WebhookProcessor {
-				$config        = $c->get( ConfigurationInterface::class );
-				$subscriptions = $c->get( SubscriptionRepositoryInterface::class );
-				$orders        = $c->get( OrderRepositoryInterface::class );
-				$bindings      = $c->get( CustomerBindingRepository::class );
-				$dispatcher    = $c->get( EventDispatcherInterface::class );
-				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
-				$get_order     = $c->get( GetOrder::class );
+				$config           = $c->get( ConfigurationInterface::class );
+				$subscriptions    = $c->get( SubscriptionRepositoryInterface::class );
+				$orders           = $c->get( OrderRepositoryInterface::class );
+				$bindings         = $c->get( CustomerBindingRepository::class );
+				$dispatcher       = $c->get( EventDispatcherInterface::class );
+				$webhookCalls     = $c->get( WebhookCallRepositoryInterface::class );
+				$get_order        = $c->get( GetOrder::class );
+				$get_subscription = $c->get( GetSubscription::class );
 
 				return new WebhookProcessor(
-					eventFactory: new WebhookEventFactory( $get_order ),
+					// fluent v0.8.0-alpha.6 made GetSubscription a required
+					// second arg: `subscription.started` is enriched via the
+					// API so the dispatched event carries the mandate (payment
+					// method on file). Enrichment is best-effort — a transient
+					// failure falls back to the webhook payload.
+					eventFactory: new WebhookEventFactory( $get_order, $get_subscription ),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
 					reactions: [
 						// Built-in fluent reactions we keep as-is.
 						new SyncSubscriptionOnStarted( $subscriptions, $bindings, $dispatcher ),
+						// Keeps the locally-stored mandate in step when a
+						// customer changes their payment method via Vatly's
+						// hosted billing-update flow (subscription.billing_updated).
+						new SyncSubscriptionOnBillingUpdated( $subscriptions ),
 						new CancelSubscriptionOnCanceled( $subscriptions ),
 						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
