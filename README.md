@@ -213,7 +213,8 @@ Two surfaces:
   `vatly_pmpro_OrderPaid`, `vatly_pmpro_SubscriptionStarted`,
   `vatly_pmpro_SubscriptionBillingUpdated`,
   `vatly_pmpro_SubscriptionCanceledImmediately`,
-  `vatly_pmpro_SubscriptionCanceledWithGracePeriod`, plus a
+  `vatly_pmpro_SubscriptionCanceledWithGracePeriod`,
+  `vatly_pmpro_SubscriptionResumed`, plus a
   `vatly_pmpro_event` catch-all. These carry full fluent event DTOs with
   tax breakdown, invoice number, payment method — handy for emitting your
   own member-facing emails or pushing into a CRM with Vatly-specific

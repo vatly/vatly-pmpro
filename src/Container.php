@@ -16,6 +16,7 @@ use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
 use Vatly\Fluent\Vatly;
 use Vatly\Fluent\Webhooks\Reactions\CancelSubscriptionOnCanceled;
+use Vatly\Fluent\Webhooks\Reactions\ResumeSubscriptionOnResumed;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnBillingUpdated;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnStarted;
 use Vatly\Fluent\Webhooks\WebhookEventFactory;
@@ -28,6 +29,7 @@ use Vatly\PMPro\Repositories\WebhookCallRepository;
 use Vatly\PMPro\Webhooks\EventDispatcher;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
+use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
@@ -176,11 +178,17 @@ class Container {
 						// hosted billing-update flow (subscription.billing_updated).
 						new SyncSubscriptionOnBillingUpdated( $subscriptions ),
 						new CancelSubscriptionOnCanceled( $subscriptions ),
+						// Resume (subscription.resumed) is the inverse of cancel:
+						// fluent clears the record's endsAt, our PMPro reaction
+						// reinstates the membership level (clearing the
+						// scheduled grace-period expiration).
+						new ResumeSubscriptionOnResumed( $subscriptions ),
 						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
 						// PMPro-specific level + subscription wiring.
 						new AssignMembershipLevelOnStarted( $bindings ),
 						new RevokeMembershipLevelOnCanceled( $bindings ),
+						new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ),
 						new WriteOrderRowOnPaid( $bindings, $orders ),
 					],
 				);

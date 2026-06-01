@@ -115,6 +115,16 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			$update['status']  = 'cancelled';
 			$format[]          = '%s';
 			$format[]          = '%s';
+		} elseif ( $data->clearEndsAt ) {
+			// Resume: drop the scheduled end date and flip the row back to
+			// active. The inverse of the cancellation branch above; a
+			// non-null endsAt always wins (matches UpdateSubscriptionData's
+			// clearEndsAt convention). $wpdb->update writes NULL for a null
+			// value regardless of the declared format.
+			$update['enddate'] = null;
+			$update['status']  = 'active';
+			$format[]          = '%s';
+			$format[]          = '%s';
 		}
 
 		if ( ! empty( $update ) ) {
