@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Unit\Webhooks\Reactions;
 
 use Brain\Monkey\Functions;
+use Vatly\API\Types\Money;
 use Vatly\API\Webhooks\Events\OrderChargebackReceived;
 use Vatly\API\Webhooks\Events\OrderChargebackReversed;
 use Vatly\API\Webhooks\Events\SubscriptionResumed;
@@ -120,8 +121,8 @@ class SuspendMembershipOnChargebackTest extends TestCase {
 			reason: 'fraudulent',
 			customerId: $customerId,
 			status: 'received',
-			total: 1000,
-			subtotal: 826,
+			total: new Money( 'EUR', '10.00' ),
+			subtotal: new Money( 'EUR', '8.26' ),
 			currency: 'EUR',
 		);
 	}
@@ -134,8 +135,8 @@ class SuspendMembershipOnChargebackTest extends TestCase {
 			reason: 'fraudulent',
 			customerId: $customerId,
 			status: 'reversed',
-			total: 1000,
-			subtotal: 826,
+			total: new Money( 'EUR', '10.00' ),
+			subtotal: new Money( 'EUR', '8.26' ),
 			currency: 'EUR',
 		);
 	}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Unit\Webhooks;
 
 use Brain\Monkey\Actions;
+use Vatly\API\Types\Money;
 use Vatly\API\Types\TaxSummaryCollection;
 use Vatly\API\Webhooks\Events\OrderPaid;
 use Vatly\PMPro\Tests\TestCase;
@@ -20,10 +21,9 @@ class EventDispatcherTest extends TestCase {
 			customerId: 'cus_1',
 			orderId: 'ord_1',
 			status: 'paid',
-			total: 1000,
-			subtotal: 800,
+			total: new Money( 'EUR', '10.00' ),
+			subtotal: new Money( 'EUR', '8.00' ),
 			taxSummary: new TaxSummaryCollection( [] ),
-			currency: 'EUR',
 			invoiceNumber: 'INV-1',
 			paymentMethod: 'creditcard',
 		);

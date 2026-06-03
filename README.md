@@ -199,7 +199,7 @@ These are in [Roadmap](#roadmap). Each is small.
 | PHP         | 8.1, 8.2, 8.3                          | —               |
 | WordPress   | 6.5 (minimum we claim), latest stable  | trunk           |
 | PMPro       | 3.0+                                   | —               |
-| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.17`     | —               |
+| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.18`     | —               |
 
 CI runs unit + integration suites across these on every PR.
 

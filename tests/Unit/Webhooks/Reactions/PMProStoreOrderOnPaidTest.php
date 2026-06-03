@@ -10,6 +10,7 @@ use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Data\StoreOrderData;
 use Vatly\Fluent\Data\UpdateOrderData;
+use Vatly\API\Types\Money;
 use Vatly\API\Types\TaxSummaryCollection;
 use Vatly\API\Webhooks\Events\OrderPaid;
 use Vatly\API\Webhooks\Events\SubscriptionStarted;
@@ -238,10 +239,9 @@ class PMProStoreOrderOnPaidTest extends TestCase {
 			customerId: 'cus_1',
 			orderId: $orderId,
 			status: 'paid',
-			total: 100,
-			subtotal: 100,
+			total: new Money( 'EUR', '1.00' ),
+			subtotal: new Money( 'EUR', '1.00' ),
 			taxSummary: new TaxSummaryCollection( [] ),
-			currency: 'EUR',
 			invoiceNumber: null,
 			paymentMethod: null,
 		);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Unit\Webhooks\Reactions;
 
 use Brain\Monkey\Functions;
+use Vatly\API\Types\Money;
 use Vatly\API\Types\TaxSummaryCollection;
 use Vatly\API\Webhooks\Events\OrderPaid;
 use Vatly\API\Webhooks\Events\SubscriptionStarted;
@@ -33,10 +34,9 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			customerId: 'cus_1',
 			orderId: 'ord_1',
 			status: 'paid',
-			total: 100,
-			subtotal: 100,
+			total: new Money( 'EUR', '1.00' ),
+			subtotal: new Money( 'EUR', '1.00' ),
 			taxSummary: new TaxSummaryCollection( [] ),
-			currency: 'EUR',
 			invoiceNumber: null,
 			paymentMethod: null,
 		) ) );
