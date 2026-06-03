@@ -56,4 +56,21 @@ class SubscriptionModel implements SubscriptionInterface {
 	public function getEndsAt(): ?DateTimeInterface {
 		return $this->endsAt;
 	}
+
+	/**
+	 * PMPro's `pmpro_subscriptions` table doesn't persist the Vatly mandate,
+	 * and this driver doesn't sync it back from the API — so the payment
+	 * method on file is never materialized locally. Per the contract, return
+	 * `null` for the "driver hasn't synced" case.
+	 */
+	public function getMandateMethod(): ?string {
+		return null;
+	}
+
+	/**
+	 * @see self::getMandateMethod() — no mandate identifier is stored locally.
+	 */
+	public function getMandateMaskedIdentifier(): ?string {
+		return null;
+	}
 }

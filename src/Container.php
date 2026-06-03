@@ -155,9 +155,10 @@ class Container {
 				$dispatcher    = $c->get( EventDispatcherInterface::class );
 				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
 				$get_order     = $c->get( GetOrder::class );
+				$get_sub       = $c->get( GetSubscription::class );
 
 				return new WebhookProcessor(
-					eventFactory: new WebhookEventFactory( $get_order ),
+					eventFactory: new WebhookEventFactory( $get_order, $get_sub ),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
