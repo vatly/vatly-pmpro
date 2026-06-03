@@ -11,6 +11,7 @@ use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
 use Vatly\Fluent\Actions\CancelSubscription;
+use Vatly\Fluent\Actions\GetChargeback;
 use Vatly\Fluent\Actions\GetCheckout;
 use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
@@ -31,6 +32,7 @@ use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
+use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
 /**
@@ -159,6 +161,7 @@ class Container {
 				$webhookCalls     = $c->get( WebhookCallRepositoryInterface::class );
 				$get_order        = $c->get( GetOrder::class );
 				$get_subscription = $c->get( GetSubscription::class );
+				$get_chargeback   = $c->get( GetChargeback::class );
 
 				return new WebhookProcessor(
 					// fluent v0.8.0-alpha.6 made GetSubscription a required
@@ -166,7 +169,18 @@ class Container {
 					// API so the dispatched event carries the mandate (payment
 					// method on file). Enrichment is best-effort — a transient
 					// failure falls back to the webhook payload.
-					eventFactory: new WebhookEventFactory( $get_order, $get_subscription ),
+					//
+					// GetChargeback is the (optional) 4th arg: enriching
+					// `order.chargeback_*` events with the customer id lets
+					// SuspendMembershipOnChargeback resolve the member via the
+					// binding repository. It still works without enrichment by
+					// falling back to the order keyed off `originalOrderId`,
+					// but the binding path is the primary one.
+					eventFactory: new WebhookEventFactory(
+						$get_order,
+						$get_subscription,
+						getChargeback: $get_chargeback,
+					),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
@@ -189,6 +203,12 @@ class Container {
 						new AssignMembershipLevelOnStarted( $bindings ),
 						new RevokeMembershipLevelOnCanceled( $bindings ),
 						new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ),
+						// Chargeback → membership access. Suspends the member on
+						// `order.chargeback_received` and reinstates the granting
+						// level on `order.chargeback_reversed`, resolving the user
+						// via the enriched customer binding (falling back to the
+						// disputed order row keyed off `originalOrderId`).
+						new SuspendMembershipOnChargeback( $bindings, $orders ),
 						new WriteOrderRowOnPaid( $bindings, $orders ),
 					],
 				);
@@ -214,6 +234,10 @@ class Container {
 		$this->set(
 			GetOrder::class,
 			static fn( Container $c ): GetOrder => $c->get( Vatly::class )->getOrder()
+		);
+		$this->set(
+			GetChargeback::class,
+			static fn( Container $c ): GetChargeback => $c->get( Vatly::class )->getChargeback()
 		);
 	}
 }
