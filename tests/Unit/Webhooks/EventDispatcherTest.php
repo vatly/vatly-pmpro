@@ -28,7 +28,7 @@ class EventDispatcherTest extends TestCase {
 			paymentMethod: 'creditcard',
 		);
 
-		Actions\expectDone('vatly_pmpro_OrderPaid')->once()->with($event);
+		Actions\expectDone('vatly_pmpro_order_paid')->once()->with($event);
 		Actions\expectDone('vatly_pmpro_event')->once()->with($event);
 
 		(new EventDispatcher())->dispatch($event);

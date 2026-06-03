@@ -210,9 +210,9 @@ Two surfaces:
   `pmpro_after_checkout`, etc.) — fired by us indirectly, same as any
   other gateway.
 - Vatly-specific events we dispatch alongside the PMPro hooks:
-  `vatly_pmpro_OrderPaid`, `vatly_pmpro_SubscriptionStarted`,
-  `vatly_pmpro_SubscriptionCanceledImmediately`,
-  `vatly_pmpro_SubscriptionCanceledWithGracePeriod`, plus a
+  `vatly_pmpro_order_paid`, `vatly_pmpro_subscription_started`,
+  `vatly_pmpro_subscription_canceled_immediately`,
+  `vatly_pmpro_subscription_canceled_with_grace_period`, plus a
   `vatly_pmpro_event` catch-all. These carry full fluent event DTOs with
   tax breakdown, invoice number, payment method — handy for emitting your
   own member-facing emails or pushing into a CRM with Vatly-specific
