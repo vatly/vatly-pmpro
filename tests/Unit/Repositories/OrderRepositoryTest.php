@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Unit\Repositories;
 
 use Brain\Monkey\Functions;
+use Vatly\API\Types\TaxSummaryCollection;
 use Vatly\Fluent\Data\StoreOrderData;
 use Vatly\Fluent\Data\UpdateOrderData;
 use Vatly\PMPro\Repositories\OrderModel;
@@ -72,6 +73,61 @@ class OrderRepositoryTest extends TestCase {
 		self::assertSame( '19.00', $data['subtotal'] );
 		self::assertSame( 'vatly', $data['gateway'] );
 		self::assertSame( 'ord_1', $data['payment_transaction_id'] );
+	}
+
+	public function test_store_sums_tax_summary_collection_items_into_tax_decimal(): void {
+		Functions\when( 'get_option' )->justReturn( 'EUR' );
+		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
+		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+
+		global $wpdb;
+		$wpdb->next_row = [
+			'id'                          => 9,
+			'user_id'                     => 7,
+			'membership_id'               => 0,
+			'code'                        => 'TAXED',
+			'payment_transaction_id'      => 'ord_taxed',
+			'status'                      => 'success',
+			'subtotal'                    => '100.00',
+			'tax'                         => '21.50',
+			'total'                       => '121.50',
+			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'payment_type'                => '',
+			'subscription_transaction_id' => '',
+		];
+
+		// Two tax lines (1750 + 400 cents) — the new api-php TaxSummaryCollection
+		// shape: item->amount is a Money decimal-string, summed via ->toCents().
+		// Built from the raw API payload shape the collection hydrates from.
+		$tax_summary = new TaxSummaryCollection(
+			[
+				[
+					'taxRate' => [ 'name' => 'Standard', 'percentage' => 21.0, 'taxablePercentage' => 100.0 ],
+					'amount'  => [ 'currency' => 'EUR', 'value' => '17.50' ],
+				],
+				[
+					'taxRate' => [ 'name' => 'Reduced', 'percentage' => 9.0, 'taxablePercentage' => 100.0 ],
+					'amount'  => [ 'currency' => 'EUR', 'value' => '4.00' ],
+				],
+			]
+		);
+
+		( new OrderRepository() )->store( new StoreOrderData(
+			vatlyId: 'ord_taxed',
+			customerId: 'cus_1',
+			status: 'paid',
+			total: 12150,
+			currency: 'EUR',
+			subtotal: 10000,
+			taxSummary: $tax_summary,
+			hostCustomerId: '7',
+		) );
+
+		$insert = $wpdb->queries[0];
+		self::assertSame( 'insert', $insert[0] );
+		[ , $data ] = $insert[1];
+		// 1750 + 400 = 2150 cents → '21.50'.
+		self::assertSame( '21.50', $data['tax'] );
 	}
 
 	public function test_store_with_no_hostCustomerId_inserts_anonymous_row(): void {

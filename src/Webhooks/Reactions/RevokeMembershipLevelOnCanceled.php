@@ -6,8 +6,8 @@ namespace Vatly\PMPro\Webhooks\Reactions;
 
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
-use Vatly\Fluent\Events\SubscriptionCanceledImmediately;
-use Vatly\Fluent\Events\SubscriptionCanceledWithGracePeriod;
+use Vatly\API\Webhooks\Events\SubscriptionCanceledImmediately;
+use Vatly\API\Webhooks\Events\SubscriptionCanceledWithGracePeriod;
 
 /**
  * Revoke (or schedule revocation of) the user's PMPro membership level on

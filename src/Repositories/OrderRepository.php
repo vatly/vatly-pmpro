@@ -8,7 +8,7 @@ use Vatly\Fluent\Contracts\OrderInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Data\StoreOrderData;
 use Vatly\Fluent\Data\UpdateOrderData;
-use Vatly\Fluent\Types\TaxSummary;
+use Vatly\API\Types\TaxSummaryCollection;
 
 /**
  * Backs the fluent {@see OrderRepositoryInterface} contract (v0.8) with
@@ -222,14 +222,14 @@ class OrderRepository implements OrderRepositoryInterface {
 		return $this->hydrate( $row );
 	}
 
-	private function tax_total( ?TaxSummary $summary ): int {
+	private function tax_total( ?TaxSummaryCollection $summary ): int {
 		if ( $summary === null ) {
 			return 0;
 		}
 
 		$total = 0;
 		foreach ( $summary->items as $item ) {
-			$total += $item->amount;
+			$total += $item->amount->toCents();
 		}
 
 		return $total;

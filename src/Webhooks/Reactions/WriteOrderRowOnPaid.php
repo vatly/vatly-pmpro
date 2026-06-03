@@ -7,7 +7,7 @@ namespace Vatly\PMPro\Webhooks\Reactions;
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\OrderReader;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
-use Vatly\Fluent\Events\OrderPaid;
+use Vatly\API\Webhooks\Events\OrderPaid;
 use Vatly\PMPro\Repositories\SubscriptionRepository;
 
 /**

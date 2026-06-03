@@ -199,7 +199,7 @@ These are in [Roadmap](#roadmap). Each is small.
 | PHP         | 8.1, 8.2, 8.3                          | —               |
 | WordPress   | 6.5 (minimum we claim), latest stable  | trunk           |
 | PMPro       | 3.0+                                   | —               |
-| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.11`     | —               |
+| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.17`     | —               |
 
 CI runs unit + integration suites across these on every PR.
 
@@ -210,11 +210,11 @@ Two surfaces:
   `pmpro_after_checkout`, etc.) — fired by us indirectly, same as any
   other gateway.
 - Vatly-specific events we dispatch alongside the PMPro hooks:
-  `vatly_pmpro_OrderPaid`, `vatly_pmpro_SubscriptionStarted`,
-  `vatly_pmpro_SubscriptionBillingUpdated`,
-  `vatly_pmpro_SubscriptionCanceledImmediately`,
-  `vatly_pmpro_SubscriptionCanceledWithGracePeriod`,
-  `vatly_pmpro_SubscriptionResumed`, plus a
+  `vatly_pmpro_order_paid`, `vatly_pmpro_subscription_started`,
+  `vatly_pmpro_subscription_billing_updated`,
+  `vatly_pmpro_subscription_canceled_immediately`,
+  `vatly_pmpro_subscription_canceled_with_grace_period`,
+  `vatly_pmpro_subscription_resumed`, plus a
   `vatly_pmpro_event` catch-all. These carry full fluent event DTOs with
   tax breakdown, invoice number, payment method — handy for emitting your
   own member-facing emails or pushing into a CRM with Vatly-specific
