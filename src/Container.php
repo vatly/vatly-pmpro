@@ -10,8 +10,8 @@ use Vatly\Fluent\Contracts\EventDispatcherInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
+use Vatly\API\VatlyApiClient;
 use Vatly\Fluent\Actions\CancelSubscription;
-use Vatly\Fluent\Actions\GetChargeback;
 use Vatly\Fluent\Actions\GetCheckout;
 use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
@@ -153,34 +153,23 @@ class Container {
 		$this->set(
 			WebhookProcessor::class,
 			static function ( Container $c ): WebhookProcessor {
-				$config           = $c->get( ConfigurationInterface::class );
-				$subscriptions    = $c->get( SubscriptionRepositoryInterface::class );
-				$orders           = $c->get( OrderRepositoryInterface::class );
-				$bindings         = $c->get( CustomerBindingRepository::class );
-				$dispatcher       = $c->get( EventDispatcherInterface::class );
-				$webhookCalls     = $c->get( WebhookCallRepositoryInterface::class );
-				$get_order        = $c->get( GetOrder::class );
-				$get_subscription = $c->get( GetSubscription::class );
-				$get_chargeback   = $c->get( GetChargeback::class );
+				$config        = $c->get( ConfigurationInterface::class );
+				$subscriptions = $c->get( SubscriptionRepositoryInterface::class );
+				$orders        = $c->get( OrderRepositoryInterface::class );
+				$bindings      = $c->get( CustomerBindingRepository::class );
+				$dispatcher    = $c->get( EventDispatcherInterface::class );
+				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
+				$get_order     = $c->get( GetOrder::class );
+				$api_client    = $c->get( Vatly::class )->getApiClient();
 
 				return new WebhookProcessor(
-					// fluent v0.8.0-alpha.6 made GetSubscription a required
-					// second arg: `subscription.started` is enriched via the
-					// API so the dispatched event carries the mandate (payment
-					// method on file). Enrichment is best-effort — a transient
-					// failure falls back to the webhook payload.
-					//
-					// GetChargeback is the (optional) 4th arg: enriching
-					// `order.chargeback_*` events with the customer id lets
-					// SuspendMembershipOnChargeback resolve the member via the
-					// binding repository. It still works without enrichment by
-					// falling back to the order keyed off `originalOrderId`,
-					// but the binding path is the primary one.
-					eventFactory: new WebhookEventFactory(
-						$get_order,
-						$get_subscription,
-						getChargeback: $get_chargeback,
-					),
+					// fluent v0.8.0-alpha.19 builds every typed event directly
+					// from the signed webhook payload — the WebhookEventFactory
+					// hydrates the money/tax-bearing events from `$webhook->object`
+					// and no longer issues follow-up `Get*` API calls. It just
+					// needs the VatlyApiClient (sourced from the Vatly composition
+					// root) to construct api-php Resource objects.
+					eventFactory: new WebhookEventFactory( $api_client ),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
@@ -234,10 +223,6 @@ class Container {
 		$this->set(
 			GetOrder::class,
 			static fn( Container $c ): GetOrder => $c->get( Vatly::class )->getOrder()
-		);
-		$this->set(
-			GetChargeback::class,
-			static fn( Container $c ): GetChargeback => $c->get( Vatly::class )->getChargeback()
 		);
 	}
 }

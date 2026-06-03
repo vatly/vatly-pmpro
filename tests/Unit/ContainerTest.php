@@ -11,7 +11,6 @@ use Vatly\Fluent\Contracts\EventDispatcherInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
-use Vatly\Fluent\Actions\GetChargeback;
 use Vatly\Fluent\Vatly;
 use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
@@ -49,7 +48,6 @@ class ContainerTest extends TestCase {
 		self::assertInstanceOf( Wiring::class, $container->get( Wiring::class ) );
 		self::assertInstanceOf( Vatly::class, $container->get( Vatly::class ) );
 		self::assertInstanceOf( WebhookProcessor::class, $container->get( WebhookProcessor::class ) );
-		self::assertInstanceOf( GetChargeback::class, $container->get( GetChargeback::class ) );
 	}
 
 	public function test_webhook_processor_wires_chargeback_membership_reaction(): void {

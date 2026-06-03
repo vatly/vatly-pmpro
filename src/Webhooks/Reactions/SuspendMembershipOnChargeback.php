@@ -23,14 +23,16 @@ use Vatly\PMPro\Repositories\OrderModel;
  *   level the disputed order granted, mirroring
  *   {@see ReinstateMembershipLevelOnResumed}.
  *
- * User resolution is two-tier so it works whether or not the event was enriched
- * via `GetChargeback`:
- *   1. Prefer the Vatly `customerId` → host user via the binding repository
- *      (only present on enriched events).
+ * User resolution is two-tier so it works whether or not the payload carried a
+ * resolvable customer binding:
+ *   1. Prefer the Vatly `customerId` → host user via the binding repository.
+ *      fluent v0.8.0-alpha.19 hydrates the chargeback event straight from the
+ *      signed webhook payload, so the `customerId` is present without any
+ *      follow-up API call.
  *   2. Fall back to the locally-stored order keyed by `originalOrderId` — the
- *      sparse webhook payload always carries that, and the PMPro order row
- *      records the `user_id`. This also yields the membership level to
- *      reinstate on reversal, which the event itself never carries.
+ *      webhook payload always carries that, and the PMPro order row records the
+ *      `user_id`. This also yields the membership level to reinstate on
+ *      reversal, which the event itself never carries.
  *
  * Find-or-skip throughout: a chargeback for an unknown customer/order, or a
  * reversal where the granting level can't be resolved, is a logged no-op rather
