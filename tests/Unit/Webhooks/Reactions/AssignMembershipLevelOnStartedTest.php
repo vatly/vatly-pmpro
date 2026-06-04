@@ -28,6 +28,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			type: 'default',
 			name: 'X',
 			quantity: 1,
+			testmode: true,
 		) ) );
 
 		self::assertFalse( $reaction->supports( new OrderPaid(
@@ -39,6 +40,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			taxSummary: new TaxSummaryCollection( [] ),
 			invoiceNumber: null,
 			paymentMethod: null,
+			testmode: true,
 		) ) );
 	}
 
@@ -62,6 +64,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			type: 'default',
 			name: 'X',
 			quantity: 1,
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -80,6 +83,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			type: 'default',
 			name: 'X',
 			quantity: 1,
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -102,6 +106,7 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 			type: 'default',
 			name: 'X',
 			quantity: 1,
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();

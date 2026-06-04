@@ -33,6 +33,7 @@ class SubscriptionModel implements SubscriptionInterface {
 		public ?DateTimeInterface $endsAt,
 		public ?string $mandateMethod = null,
 		public ?string $mandateMaskedIdentifier = null,
+		public bool $testmode = false,
 	) {}
 
 	public function getVatlyId(): string {
@@ -76,5 +77,14 @@ class SubscriptionModel implements SubscriptionInterface {
 	 */
 	public function getMandateMaskedIdentifier(): ?string {
 		return $this->mandateMaskedIdentifier;
+	}
+
+	/**
+	 * Test vs live, mirrored from PMPro's own per-subscription
+	 * `gateway_environment` (`sandbox` = test) — frozen when the row was
+	 * written from the Vatly webhook.
+	 */
+	public function isTestmode(): bool {
+		return $this->testmode;
 	}
 }

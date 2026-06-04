@@ -31,6 +31,7 @@ class OrderModel implements OrderInterface {
 		public ?string $invoiceNumber,
 		public ?string $paymentMethod,
 		public ?string $subscriptionTransactionId,
+		public bool $testmode = false,
 	) {}
 
 	public function getVatlyId(): string {
@@ -59,5 +60,15 @@ class OrderModel implements OrderInterface {
 
 	public function isPaid(): bool {
 		return $this->status === 'success';
+	}
+
+	/**
+	 * Test vs live, mirrored from PMPro's own per-order `gateway_environment`
+	 * (`sandbox` = test) — frozen when the order row was written from the Vatly
+	 * webhook, so it reflects the record's mode rather than the current global
+	 * PMPro environment setting.
+	 */
+	public function isTestmode(): bool {
+		return $this->testmode;
 	}
 }

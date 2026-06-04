@@ -75,7 +75,10 @@ class OrderRepository implements OrderRepositoryInterface {
 				'user_id'                     => $user_id,
 				'membership_id'               => $this->level_id_for_user( $user_id ),
 				'gateway'                     => self::GATEWAY,
-				'gateway_environment'         => $this->gateway_environment(),
+				// Freeze the record's own mode from the Vatly event, not the
+				// current global PMPro environment toggle — so follow-up
+				// operations stay consistent if the merchant later flips it.
+				'gateway_environment'         => $data->testmode ? 'sandbox' : 'live',
 				'payment_transaction_id'      => $data->vatlyId,
 				'subscription_transaction_id' => '',
 				'payment_type'                => (string) ( $data->paymentMethod ?? '' ),
@@ -202,6 +205,7 @@ class OrderRepository implements OrderRepositoryInterface {
 			invoiceNumber: $invoice_number,
 			paymentMethod: ( $row['payment_type'] ?? '' ) ?: null,
 			subscriptionTransactionId: ( $row['subscription_transaction_id'] ?? '' ) ?: null,
+			testmode: ( (string) ( $row['gateway_environment'] ?? 'live' ) ) === 'sandbox',
 		);
 	}
 
@@ -299,10 +303,6 @@ class OrderRepository implements OrderRepositoryInterface {
 		$currency = (string) get_option( 'pmpro_currency', 'EUR' );
 
 		return $currency !== '' ? strtoupper( $currency ) : 'EUR';
-	}
-
-	private function gateway_environment(): string {
-		return (string) get_option( 'pmpro_gateway_environment', 'sandbox' );
 	}
 
 	private function level_id_for_user( int $user_id ): int {

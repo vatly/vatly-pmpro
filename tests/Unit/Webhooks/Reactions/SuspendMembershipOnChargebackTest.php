@@ -31,6 +31,7 @@ class SuspendMembershipOnChargebackTest extends TestCase {
 		self::assertFalse( $reaction->supports( new SubscriptionResumed(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) ) );
 	}
 
@@ -124,6 +125,7 @@ class SuspendMembershipOnChargebackTest extends TestCase {
 			total: new Money( 'EUR', '10.00' ),
 			subtotal: new Money( 'EUR', '8.26' ),
 			currency: 'EUR',
+			testmode: true,
 		);
 	}
 
@@ -138,6 +140,7 @@ class SuspendMembershipOnChargebackTest extends TestCase {
 			total: new Money( 'EUR', '10.00' ),
 			subtotal: new Money( 'EUR', '8.26' ),
 			currency: 'EUR',
+			testmode: true,
 		);
 	}
 

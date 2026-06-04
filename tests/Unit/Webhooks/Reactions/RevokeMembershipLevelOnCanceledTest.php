@@ -24,12 +24,14 @@ class RevokeMembershipLevelOnCanceledTest extends TestCase {
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
 			endsAt: new DateTimeImmutable(),
+			testmode: true,
 		) ) );
 
 		self::assertTrue( $reaction->supports( new SubscriptionCanceledWithGracePeriod(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
 			endsAt: new DateTimeImmutable(),
+			testmode: true,
 		) ) );
 	}
 
@@ -45,6 +47,7 @@ class RevokeMembershipLevelOnCanceledTest extends TestCase {
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
 			endsAt: new DateTimeImmutable(),
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -60,6 +63,7 @@ class RevokeMembershipLevelOnCanceledTest extends TestCase {
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
 			endsAt: new DateTimeImmutable( '+10 days' ),
+			testmode: true,
 		) );
 	}
 
@@ -74,6 +78,7 @@ class RevokeMembershipLevelOnCanceledTest extends TestCase {
 			customerId: 'cus_orphan',
 			subscriptionId: 'sub_1',
 			endsAt: new DateTimeImmutable(),
+			testmode: true,
 		) );
 	}
 }

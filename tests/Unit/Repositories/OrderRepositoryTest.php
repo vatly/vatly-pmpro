@@ -59,6 +59,7 @@ class OrderRepositoryTest extends TestCase {
 			subtotal: 1900,
 			taxSummary: null,
 			hostCustomerId: '7',
+			testmode: true,
 		) );
 
 		self::assertInstanceOf( OrderModel::class, $order );
@@ -73,6 +74,44 @@ class OrderRepositoryTest extends TestCase {
 		self::assertSame( '19.00', $data['subtotal'] );
 		self::assertSame( 'vatly', $data['gateway'] );
 		self::assertSame( 'ord_1', $data['payment_transaction_id'] );
+		// testmode:true on the event → PMPro's `sandbox` environment, frozen
+		// per-record (not read from the global pmpro_gateway_environment).
+		self::assertSame( 'sandbox', $data['gateway_environment'] );
+	}
+
+	public function test_store_persists_live_environment_for_live_orders(): void {
+		Functions\when( 'get_option' )->justReturn( 'EUR' );
+		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
+		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+
+		global $wpdb;
+		$wpdb->next_row = [
+			'id'                          => 12,
+			'user_id'                     => 7,
+			'payment_transaction_id'      => 'ord_live',
+			'status'                      => 'success',
+			'subtotal'                    => '19.00',
+			'tax'                         => '0.00',
+			'total'                       => '23.00',
+			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'payment_type'                => '',
+			'subscription_transaction_id' => '',
+			'gateway_environment'         => 'live',
+		];
+
+		$order = ( new OrderRepository() )->store( new StoreOrderData(
+			vatlyId: 'ord_live',
+			customerId: 'cus_1',
+			status: 'paid',
+			total: 2300,
+			currency: 'EUR',
+			hostCustomerId: '7',
+			testmode: false,
+		) );
+
+		[ , $data ] = $wpdb->queries[0][1];
+		self::assertSame( 'live', $data['gateway_environment'] );
+		self::assertFalse( $order->isTestmode() );
 	}
 
 	public function test_store_sums_tax_summary_collection_items_into_tax_decimal(): void {
@@ -121,6 +160,7 @@ class OrderRepositoryTest extends TestCase {
 			subtotal: 10000,
 			taxSummary: $tax_summary,
 			hostCustomerId: '7',
+			testmode: true,
 		) );
 
 		$insert = $wpdb->queries[0];
@@ -157,6 +197,7 @@ class OrderRepositoryTest extends TestCase {
 			status: 'paid',
 			total: 1000,
 			currency: 'EUR',
+			testmode: true,
 		) );
 
 		$ops = array_column( $wpdb->queries, 0 );
@@ -238,6 +279,7 @@ class OrderRepositoryTest extends TestCase {
 			total: 5000,
 			currency: 'JPY',
 			hostCustomerId: '1',
+			testmode: true,
 		) );
 
 		$insert = $wpdb->queries[0];

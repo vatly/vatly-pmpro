@@ -26,6 +26,7 @@ class EventDispatcherTest extends TestCase {
 			taxSummary: new TaxSummaryCollection( [] ),
 			invoiceNumber: 'INV-1',
 			paymentMethod: 'creditcard',
+			testmode: true,
 		);
 
 		Actions\expectDone('vatly_pmpro_order_paid')->once()->with($event);

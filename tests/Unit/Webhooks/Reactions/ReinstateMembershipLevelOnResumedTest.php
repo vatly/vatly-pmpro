@@ -27,6 +27,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 		self::assertTrue( $reaction->supports( new SubscriptionResumed(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) ) );
 
 		self::assertFalse( $reaction->supports( new SubscriptionStarted(
@@ -36,6 +37,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 			type: 'default',
 			name: 'X',
 			quantity: 1,
+			testmode: true,
 		) ) );
 	}
 
@@ -59,6 +61,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 		( new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ) )->handle( new SubscriptionResumed(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -76,6 +79,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 		( new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ) )->handle( new SubscriptionResumed(
 			customerId: 'cus_orphan',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -93,6 +97,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 		( new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ) )->handle( new SubscriptionResumed(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();
@@ -114,6 +119,7 @@ class ReinstateMembershipLevelOnResumedTest extends TestCase {
 		( new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ) )->handle( new SubscriptionResumed(
 			customerId: 'cus_1',
 			subscriptionId: 'sub_1',
+			testmode: true,
 		) );
 
 		$this->assertHookExpectations();

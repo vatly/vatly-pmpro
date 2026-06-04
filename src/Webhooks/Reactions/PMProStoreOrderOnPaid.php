@@ -188,6 +188,7 @@ class PMProStoreOrderOnPaid implements WebhookReactionInterface {
 			subtotal: $event->subtotal->toCents(),
 			taxSummary: $event->taxSummary,
 			hostCustomerId: $host_customer_id,
+			testmode: $event->testmode,
 		) );
 	}
 
