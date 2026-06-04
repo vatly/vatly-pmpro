@@ -30,6 +30,7 @@ class PMProStoreOrderOnPaidTest extends TestCase {
 		self::assertFalse( $reaction->supports( new SubscriptionStarted(
 			customerId: 'cus_1', subscriptionId: 'sub_1', planId: 'plan',
 			type: 'default', name: 'N', quantity: 1,
+			testmode: true,
 		) ) );
 	}
 
@@ -244,6 +245,7 @@ class PMProStoreOrderOnPaidTest extends TestCase {
 			taxSummary: new TaxSummaryCollection( [] ),
 			invoiceNumber: null,
 			paymentMethod: null,
+			testmode: true,
 		);
 	}
 

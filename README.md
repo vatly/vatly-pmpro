@@ -149,6 +149,16 @@ Per-level setup:
 
 - Edit a PMPro level → scroll to **Vatly Plan** → paste the `plan_xxx` id.
 
+### Test vs live (per-record)
+
+Each Vatly order/subscription freezes its test/live mode when its
+`pmpro_membership_orders` / `pmpro_subscriptions` row is written from the
+webhook: a test-mode Vatly record is stored with PMPro's `gateway_environment`
+set to `sandbox`, a live one with `live` — taken from the event itself, not the
+current global toggle. The mode is read back per record via `isTestmode()` on
+the Vatly order/subscription models, keeping test and live data cleanly
+separated even if you later flip the gateway environment.
+
 ## FAQ
 
 **Will this break my LearnDash / BuddyBoss / WP Fusion / [LMS] integration?**

@@ -33,6 +33,7 @@ class WriteOrderRowOnPaidTest extends TestCase {
 			type: 'default',
 			name: 'N',
 			quantity: 1,
+			testmode: true,
 		) ) );
 	}
 
@@ -118,6 +119,7 @@ class WriteOrderRowOnPaidTest extends TestCase {
 			taxSummary: new TaxSummaryCollection( [] ),
 			invoiceNumber: null,
 			paymentMethod: null,
+			testmode: true,
 		);
 	}
 }

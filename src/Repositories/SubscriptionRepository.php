@@ -72,7 +72,9 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 				'user_id'                     => $user_id,
 				'membership_level_id'         => $level_id,
 				'gateway'                     => self::GATEWAY,
-				'gateway_environment'         => $this->gateway_environment(),
+				// Freeze the subscription's own mode from the Vatly event, not
+				// the current global PMPro environment toggle.
+				'gateway_environment'         => $data->testmode ? 'sandbox' : 'live',
 				'subscription_transaction_id' => $data->vatlyId,
 				'status'                      => 'active',
 				'startdate'                   => current_time( 'mysql', true ),
@@ -185,6 +187,7 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			endsAt: $ends_at,
 			mandateMethod: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_METHOD ),
 			mandateMaskedIdentifier: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_MASKED_IDENTIFIER ),
+			testmode: ( (string) ( $row['gateway_environment'] ?? 'live' ) ) === 'sandbox',
 		);
 	}
 
@@ -290,9 +293,5 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 		$level = pmpro_getLevel( $level_id );
 
 		return $level ? (string) $level->name : '';
-	}
-
-	private function gateway_environment(): string {
-		return (string) get_option( 'pmpro_gateway_environment', 'sandbox' );
 	}
 }

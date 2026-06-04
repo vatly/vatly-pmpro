@@ -81,6 +81,11 @@ class SubscriptionModelTest extends TestCase {
 		self::assertSame( '4242', $model->getMandateMaskedIdentifier() );
 	}
 
+	public function test_is_testmode_reflects_the_constructor_flag(): void {
+		self::assertTrue( $this->make( [ 'testmode' => true ] )->isTestmode() );
+		self::assertFalse( $this->make( [ 'testmode' => false ] )->isTestmode() );
+	}
+
 	private function make( array $overrides ): SubscriptionModel {
 		return new SubscriptionModel(
 			id: $overrides['id'] ?? 1,
@@ -94,6 +99,7 @@ class SubscriptionModelTest extends TestCase {
 			endsAt: $overrides['endsAt'] ?? null,
 			mandateMethod: $overrides['mandateMethod'] ?? null,
 			mandateMaskedIdentifier: $overrides['mandateMaskedIdentifier'] ?? null,
+			testmode: $overrides['testmode'] ?? false,
 		);
 	}
 }
