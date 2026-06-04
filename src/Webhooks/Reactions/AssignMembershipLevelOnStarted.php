@@ -6,7 +6,7 @@ namespace Vatly\PMPro\Webhooks\Reactions;
 
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
-use Vatly\Fluent\Events\SubscriptionStarted;
+use Vatly\API\Webhooks\Events\SubscriptionStarted;
 use Vatly\PMPro\Repositories\SubscriptionRepository;
 
 /**

@@ -16,6 +16,7 @@ use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
 use Vatly\PMPro\Container;
 use Vatly\PMPro\Tests\TestCase;
+use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 
 /**
  * @covers \Vatly\PMPro\Container
@@ -47,6 +48,35 @@ class ContainerTest extends TestCase {
 		self::assertInstanceOf( Wiring::class, $container->get( Wiring::class ) );
 		self::assertInstanceOf( Vatly::class, $container->get( Vatly::class ) );
 		self::assertInstanceOf( WebhookProcessor::class, $container->get( WebhookProcessor::class ) );
+	}
+
+	public function test_webhook_processor_wires_chargeback_membership_reaction(): void {
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = '' ) {
+				$opts = [
+					'vatly_pmpro_api_key_test'  => 'test_localdevkeyXXXXXXXXX',
+					'pmpro_gateway_environment' => 'sandbox',
+				];
+
+				return $opts[ $key ] ?? $default;
+			}
+		);
+
+		$container = new Container();
+		$processor = $container->get( WebhookProcessor::class );
+
+		$has_chargeback_reaction = false;
+		foreach ( $processor->getReactions() as $reaction ) {
+			if ( $reaction instanceof SuspendMembershipOnChargeback ) {
+				$has_chargeback_reaction = true;
+				break;
+			}
+		}
+
+		self::assertTrue(
+			$has_chargeback_reaction,
+			'Expected the WebhookProcessor to wire SuspendMembershipOnChargeback.'
+		);
 	}
 
 	public function test_container_memoises_instances(): void {

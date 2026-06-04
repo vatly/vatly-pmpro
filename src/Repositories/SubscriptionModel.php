@@ -31,6 +31,8 @@ class SubscriptionModel implements SubscriptionInterface {
 		public int $quantity,
 		public string $status,
 		public ?DateTimeInterface $endsAt,
+		public ?string $mandateMethod = null,
+		public ?string $mandateMaskedIdentifier = null,
 	) {}
 
 	public function getVatlyId(): string {
@@ -55,5 +57,24 @@ class SubscriptionModel implements SubscriptionInterface {
 
 	public function getEndsAt(): ?DateTimeInterface {
 		return $this->endsAt;
+	}
+
+	/**
+	 * Payment-method category on file (`card`, `sepa_debit`, `paypal`, …).
+	 *
+	 * Persisted as subscription meta by {@see SubscriptionRepository}; null
+	 * when no mandate has been synced yet (e.g. ended-before-payment).
+	 */
+	public function getMandateMethod(): ?string {
+		return $this->mandateMethod;
+	}
+
+	/**
+	 * Customer-facing masked identifier for the mandate — card last 4
+	 * (`4242`) or masked IBAN (`NL91****4300`). Null for mandate types
+	 * without an identifier (PayPal) or when no mandate has been synced.
+	 */
+	public function getMandateMaskedIdentifier(): ?string {
+		return $this->mandateMaskedIdentifier;
 	}
 }

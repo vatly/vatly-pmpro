@@ -10,14 +10,17 @@ use Vatly\Fluent\Contracts\EventDispatcherInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
+use Vatly\API\VatlyApiClient;
+use Vatly\API\Webhooks\WebhookEventFactory;
 use Vatly\Fluent\Actions\CancelSubscription;
 use Vatly\Fluent\Actions\GetCheckout;
 use Vatly\Fluent\Actions\GetOrder;
 use Vatly\Fluent\Actions\GetSubscription;
 use Vatly\Fluent\Vatly;
 use Vatly\Fluent\Webhooks\Reactions\CancelSubscriptionOnCanceled;
+use Vatly\Fluent\Webhooks\Reactions\ResumeSubscriptionOnResumed;
+use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnBillingUpdated;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnStarted;
-use Vatly\Fluent\Webhooks\WebhookEventFactory;
 use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
 use Vatly\PMPro\Repositories\OrderRepository;
@@ -27,7 +30,9 @@ use Vatly\PMPro\Repositories\WebhookCallRepository;
 use Vatly\PMPro\Webhooks\EventDispatcher;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
+use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
+use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
 /**
@@ -155,21 +160,44 @@ class Container {
 				$dispatcher    = $c->get( EventDispatcherInterface::class );
 				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
 				$get_order     = $c->get( GetOrder::class );
+				$api_client    = $c->get( Vatly::class )->getApiClient();
 
 				return new WebhookProcessor(
-					eventFactory: new WebhookEventFactory( $get_order ),
+					// fluent v0.8.0-alpha.19 builds every typed event directly
+					// from the signed webhook payload — the WebhookEventFactory
+					// hydrates the money/tax-bearing events from `$webhook->object`
+					// and no longer issues follow-up `Get*` API calls. It just
+					// needs the VatlyApiClient (sourced from the Vatly composition
+					// root) to construct api-php Resource objects.
+					eventFactory: new WebhookEventFactory( $api_client ),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
 					reactions: [
 						// Built-in fluent reactions we keep as-is.
 						new SyncSubscriptionOnStarted( $subscriptions, $bindings, $dispatcher ),
+						// Keeps the locally-stored mandate in step when a
+						// customer changes their payment method via Vatly's
+						// hosted billing-update flow (subscription.billing_updated).
+						new SyncSubscriptionOnBillingUpdated( $subscriptions ),
 						new CancelSubscriptionOnCanceled( $subscriptions ),
+						// Resume (subscription.resumed) is the inverse of cancel:
+						// fluent clears the record's endsAt, our PMPro reaction
+						// reinstates the membership level (clearing the
+						// scheduled grace-period expiration).
+						new ResumeSubscriptionOnResumed( $subscriptions ),
 						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
 						// PMPro-specific level + subscription wiring.
 						new AssignMembershipLevelOnStarted( $bindings ),
 						new RevokeMembershipLevelOnCanceled( $bindings ),
+						new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ),
+						// Chargeback → membership access. Suspends the member on
+						// `order.chargeback_received` and reinstates the granting
+						// level on `order.chargeback_reversed`, resolving the user
+						// via the enriched customer binding (falling back to the
+						// disputed order row keyed off `originalOrderId`).
+						new SuspendMembershipOnChargeback( $bindings, $orders ),
 						new WriteOrderRowOnPaid( $bindings, $orders ),
 					],
 				);

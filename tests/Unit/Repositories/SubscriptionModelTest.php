@@ -62,6 +62,25 @@ class SubscriptionModelTest extends TestCase {
 		self::assertFalse( $model->isEnded() );
 	}
 
+	public function test_mandate_getters_default_to_null(): void {
+		$model = $this->make( [ 'status' => 'active', 'endsAt' => null ] );
+
+		self::assertNull( $model->getMandateMethod() );
+		self::assertNull( $model->getMandateMaskedIdentifier() );
+	}
+
+	public function test_mandate_getters_return_persisted_values(): void {
+		$model = $this->make( [
+			'status'                  => 'active',
+			'endsAt'                  => null,
+			'mandateMethod'           => 'card',
+			'mandateMaskedIdentifier' => '4242',
+		] );
+
+		self::assertSame( 'card', $model->getMandateMethod() );
+		self::assertSame( '4242', $model->getMandateMaskedIdentifier() );
+	}
+
 	private function make( array $overrides ): SubscriptionModel {
 		return new SubscriptionModel(
 			id: $overrides['id'] ?? 1,
@@ -73,6 +92,8 @@ class SubscriptionModelTest extends TestCase {
 			quantity: $overrides['quantity'] ?? 1,
 			status: $overrides['status'] ?? 'active',
 			endsAt: $overrides['endsAt'] ?? null,
+			mandateMethod: $overrides['mandateMethod'] ?? null,
+			mandateMaskedIdentifier: $overrides['mandateMaskedIdentifier'] ?? null,
 		);
 	}
 }

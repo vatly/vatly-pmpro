@@ -10,7 +10,7 @@ use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookReactionInterface;
 use Vatly\Fluent\Data\StoreOrderData;
 use Vatly\Fluent\Data\UpdateOrderData;
-use Vatly\Fluent\Events\OrderPaid;
+use Vatly\API\Webhooks\Events\OrderPaid;
 use Vatly\PMPro\Repositories\OrderRepository;
 
 /**
@@ -181,11 +181,11 @@ class PMProStoreOrderOnPaid implements WebhookReactionInterface {
 			vatlyId: $event->orderId,
 			customerId: $event->customerId,
 			status: 'paid',
-			total: $event->total,
-			currency: $event->currency,
+			total: $event->total->toCents(),
+			currency: $event->total->currency,
 			invoiceNumber: $event->invoiceNumber,
 			paymentMethod: $event->paymentMethod,
-			subtotal: $event->subtotal,
+			subtotal: $event->subtotal->toCents(),
 			taxSummary: $event->taxSummary,
 			hostCustomerId: $host_customer_id,
 		) );
@@ -245,11 +245,11 @@ class PMProStoreOrderOnPaid implements WebhookReactionInterface {
 	private function update_payload( OrderPaid $event ): UpdateOrderData {
 		return new UpdateOrderData(
 			status: 'paid',
-			total: $event->total,
-			currency: $event->currency,
+			total: $event->total->toCents(),
+			currency: $event->total->currency,
 			invoiceNumber: $event->invoiceNumber,
 			paymentMethod: $event->paymentMethod,
-			subtotal: $event->subtotal,
+			subtotal: $event->subtotal->toCents(),
 			taxSummary: $event->taxSummary,
 		);
 	}

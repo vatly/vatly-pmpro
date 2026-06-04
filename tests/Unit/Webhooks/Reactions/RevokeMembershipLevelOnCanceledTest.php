@@ -6,9 +6,9 @@ namespace Vatly\PMPro\Tests\Unit\Webhooks\Reactions;
 
 use Brain\Monkey\Functions;
 use DateTimeImmutable;
+use Vatly\API\Webhooks\Events\SubscriptionCanceledImmediately;
+use Vatly\API\Webhooks\Events\SubscriptionCanceledWithGracePeriod;
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
-use Vatly\Fluent\Events\SubscriptionCanceledImmediately;
-use Vatly\Fluent\Events\SubscriptionCanceledWithGracePeriod;
 use Vatly\PMPro\Tests\TestCase;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
 

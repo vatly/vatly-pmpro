@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Tests\Unit;
 
-use Vatly\Fluent\Actions\GetOrder;
+use Vatly\API\VatlyApiClient;
 use Vatly\Fluent\Contracts\ConfigurationInterface;
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
 use Vatly\Fluent\Contracts\EventDispatcherInterface;
@@ -31,7 +31,7 @@ class WebhookSignatureRoundTripTest extends TestCase {
 			\Mockery::mock( WebhookCallRepositoryInterface::class ),
 			\Mockery::mock( EventDispatcherInterface::class ),
 			\Mockery::mock( CustomerBindingRepository::class ),
-			\Mockery::mock( GetOrder::class ),
+			\Mockery::mock( VatlyApiClient::class ),
 		);
 
 		$payload   = '{"id":"evt_1","resource":"subscription","eventName":"subscription.started","entityType":"subscription","entityId":"sub_1","testmode":true,"createdAt":"2026-01-01T00:00:00Z","object":{"customerId":"cus_1"}}';
@@ -50,7 +50,7 @@ class WebhookSignatureRoundTripTest extends TestCase {
 			\Mockery::mock( WebhookCallRepositoryInterface::class ),
 			\Mockery::mock( EventDispatcherInterface::class ),
 			\Mockery::mock( CustomerBindingRepository::class ),
-			\Mockery::mock( GetOrder::class ),
+			\Mockery::mock( VatlyApiClient::class ),
 		);
 
 		$this->expectException( InvalidWebhookSignatureException::class );

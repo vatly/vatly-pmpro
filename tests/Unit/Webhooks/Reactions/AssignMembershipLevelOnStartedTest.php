@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Tests\Unit\Webhooks\Reactions;
 
 use Brain\Monkey\Functions;
+use Vatly\API\Types\Money;
+use Vatly\API\Types\TaxSummaryCollection;
+use Vatly\API\Webhooks\Events\OrderPaid;
+use Vatly\API\Webhooks\Events\SubscriptionStarted;
 use Vatly\Fluent\Contracts\CustomerBindingRepository;
-use Vatly\Fluent\Events\OrderPaid;
-use Vatly\Fluent\Events\SubscriptionStarted;
-use Vatly\Fluent\Types\TaxSummary;
 use Vatly\PMPro\Tests\TestCase;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
 
@@ -32,10 +33,10 @@ class AssignMembershipLevelOnStartedTest extends TestCase {
 		self::assertFalse( $reaction->supports( new OrderPaid(
 			customerId: 'cus_1',
 			orderId: 'ord_1',
-			total: 100,
-			subtotal: 100,
-			taxSummary: TaxSummary::empty(),
-			currency: 'EUR',
+			status: 'paid',
+			total: new Money( 'EUR', '1.00' ),
+			subtotal: new Money( 'EUR', '1.00' ),
+			taxSummary: new TaxSummaryCollection( [] ),
 			invoiceNumber: null,
 			paymentMethod: null,
 		) ) );

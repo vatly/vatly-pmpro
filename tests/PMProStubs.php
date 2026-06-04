@@ -49,6 +49,24 @@ if (!function_exists('update_pmpro_membership_order_meta')) {
 	}
 }
 
+if (!function_exists('get_pmpro_subscription_meta')) {
+	function get_pmpro_subscription_meta(int $subscription_id, string $key, bool $single = true) {
+		return '';
+	}
+}
+
+if (!function_exists('update_pmpro_subscription_meta')) {
+	function update_pmpro_subscription_meta(int $subscription_id, string $key, $value) {
+		return true;
+	}
+}
+
+if (!function_exists('delete_pmpro_subscription_meta')) {
+	function delete_pmpro_subscription_meta(int $subscription_id, string $key, $value = '') {
+		return true;
+	}
+}
+
 if (!function_exists('pmpro_changeMembershipLevel')) {
 	function pmpro_changeMembershipLevel($level_id, int $user_id, string $reason = 'changed') {
 		return true;
