@@ -1,3 +1,5 @@
+![Vatly for Paid Memberships Pro](art/banner.png)
+
 # Vatly Gateway for Paid Memberships Pro
 
 [![Tests](https://img.shields.io/badge/tests-PHPUnit-orange.svg)](#testing)
