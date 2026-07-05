@@ -65,7 +65,7 @@ jobs:
           # Confirm vendor/autoload.php exists and the classmap is populated.
           test -f "${SCOPED}/vendor/autoload.php"
           test -f "${SCOPED}/vendor/composer/autoload_classmap.php"
-          grep -c "Vatly\\\\PMPro\\\\Vendor" "${SCOPED}/vendor/composer/autoload_classmap.php" \
+          grep -c "Vatly\\\\\\\\PMPro\\\\\\\\Vendor" "${SCOPED}/vendor/composer/autoload_classmap.php" \
             | awk '$1 < 50 { print "Classmap looks empty"; exit 1 }'
 
       - name: Attach zip to release
