@@ -16,6 +16,7 @@ use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
 use Vatly\PMPro\Container;
 use Vatly\PMPro\Tests\TestCase;
+use Vatly\PMPro\Webhooks\Reactions\ChangeMembershipLevelOnUpdated;
 use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 
 /**
@@ -66,16 +67,24 @@ class ContainerTest extends TestCase {
 		$processor = $container->get( WebhookProcessor::class );
 
 		$has_chargeback_reaction = false;
+		$has_updated_reaction    = false;
 		foreach ( $processor->getReactions() as $reaction ) {
 			if ( $reaction instanceof SuspendMembershipOnChargeback ) {
 				$has_chargeback_reaction = true;
-				break;
+			}
+			if ( $reaction instanceof ChangeMembershipLevelOnUpdated ) {
+				$has_updated_reaction = true;
 			}
 		}
 
 		self::assertTrue(
 			$has_chargeback_reaction,
 			'Expected the WebhookProcessor to wire SuspendMembershipOnChargeback.'
+		);
+
+		self::assertTrue(
+			$has_updated_reaction,
+			'Expected the WebhookProcessor to wire ChangeMembershipLevelOnUpdated for subscription.updated.'
 		);
 	}
 

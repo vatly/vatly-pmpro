@@ -28,7 +28,8 @@ your memberships:
 - Vatly charges, collects VAT, splits it correctly per country / rate / rule,
   and issues compliant invoices in your name.
 - Webhooks sync subscription state back to PMPro: levels are assigned on
-  payment, revoked on cancellation, orders are written on every renewal.
+  payment, changed when a member switches plan, revoked on cancellation,
+  orders are written on every renewal.
 - Your PMPro site keeps doing what it's good at: content gating, member
   dashboards, discount codes, drip content, BuddyPress / LMS hooks.
 

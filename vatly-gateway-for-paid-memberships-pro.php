@@ -3,7 +3,7 @@
  * Plugin Name:       Vatly Gateway for Paid Memberships Pro
  * Plugin URI:        https://vatly.com/integrations/paid-memberships-pro
  * Description:       Sell PMPro memberships through Vatly — the merchant of record that handles EU VAT, payment methods (cards, PayPal, iDEAL, Apple Pay, SEPA) and recurring billing for you.
- * Version:           0.1.0
+ * Version:           0.2.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Vatly

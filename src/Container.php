@@ -21,6 +21,7 @@ use Vatly\Fluent\Webhooks\Reactions\CancelSubscriptionOnCanceled;
 use Vatly\Fluent\Webhooks\Reactions\ResumeSubscriptionOnResumed;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnBillingUpdated;
 use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnStarted;
+use Vatly\Fluent\Webhooks\Reactions\SyncSubscriptionOnUpdated;
 use Vatly\Fluent\Webhooks\WebhookProcessor;
 use Vatly\Fluent\Wiring;
 use Vatly\PMPro\Repositories\OrderRepository;
@@ -29,6 +30,7 @@ use Vatly\PMPro\Repositories\UserMetaCustomerBindings;
 use Vatly\PMPro\Repositories\WebhookCallRepository;
 use Vatly\PMPro\Webhooks\EventDispatcher;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
+use Vatly\PMPro\Webhooks\Reactions\ChangeMembershipLevelOnUpdated;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
@@ -180,6 +182,10 @@ class Container {
 						// customer changes their payment method via Vatly's
 						// hosted billing-update flow (subscription.billing_updated).
 						new SyncSubscriptionOnBillingUpdated( $subscriptions ),
+						// Immediate plan/price/quantity change (subscription.updated):
+						// fluent keeps the stored subscription row's plan/level in
+						// step; our PMPro reaction below moves the member's level.
+						new SyncSubscriptionOnUpdated( $subscriptions ),
 						new CancelSubscriptionOnCanceled( $subscriptions ),
 						// Resume (subscription.resumed) is the inverse of cancel:
 						// fluent clears the record's endsAt, our PMPro reaction
@@ -190,6 +196,9 @@ class Container {
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
 						// PMPro-specific level + subscription wiring.
 						new AssignMembershipLevelOnStarted( $bindings ),
+						// Immediate plan change: move the member to the level
+						// mapped to the new plan (subscription.updated).
+						new ChangeMembershipLevelOnUpdated( $bindings ),
 						new RevokeMembershipLevelOnCanceled( $bindings ),
 						new ReinstateMembershipLevelOnResumed( $bindings, $subscriptions ),
 						// Chargeback → membership access. Suspends the member on
