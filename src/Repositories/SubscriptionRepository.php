@@ -36,6 +36,9 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 	/** Subscription-meta key: customer-facing masked identifier (card last-4, masked IBAN). */
 	public const META_MANDATE_MASKED_IDENTIFIER = 'vatly_mandate_masked_identifier';
 
+	/** Subscription-meta key: raw Vatly cancellation reason (`payment_failure`, `merchant_request`, `customer_request`). */
+	public const META_CANCELLATION_REASON = 'vatly_cancellation_reason';
+
 	public function findByVatlyId( string $vatlyId ): ?SubscriptionInterface {
 		global $wpdb;
 
@@ -151,6 +154,19 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			$this->write_mandate( $subscription->id, null );
 		}
 
+		// Persist the cancellation reason (`payment_failure` / `merchant_request`
+		// / `customer_request`) fluent now passes through on a cancellation
+		// webhook, so support/reporting surfaces can explain why a membership
+		// lapsed. Stored as subscription meta; null means "no change".
+		if ( $data->cancellationReason !== null && $subscription->id !== 0
+			&& function_exists( 'update_pmpro_subscription_meta' ) ) {
+			update_pmpro_subscription_meta(
+				$subscription->id,
+				self::META_CANCELLATION_REASON,
+				$data->cancellationReason
+			);
+		}
+
 		return $this->find_by_id( $subscription->id );
 	}
 
@@ -188,6 +204,7 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 			mandateMethod: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_METHOD ),
 			mandateMaskedIdentifier: $this->read_mandate_meta( $subscription_id, self::META_MANDATE_MASKED_IDENTIFIER ),
 			testmode: ( (string) ( $row['gateway_environment'] ?? 'live' ) ) === 'sandbox',
+			cancellationReason: $this->read_mandate_meta( $subscription_id, self::META_CANCELLATION_REASON ),
 		);
 	}
 
