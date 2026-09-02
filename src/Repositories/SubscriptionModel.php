@@ -34,6 +34,7 @@ class SubscriptionModel implements SubscriptionInterface {
 		public ?string $mandateMethod = null,
 		public ?string $mandateMaskedIdentifier = null,
 		public bool $testmode = false,
+		public ?string $cancellationReason = null,
 	) {}
 
 	public function getVatlyId(): string {
@@ -86,5 +87,17 @@ class SubscriptionModel implements SubscriptionInterface {
 	 */
 	public function isTestmode(): bool {
 		return $this->testmode;
+	}
+
+	/**
+	 * Raw Vatly cancellation reason (`payment_failure`, `merchant_request`,
+	 * `customer_request`) persisted as subscription meta when a cancellation
+	 * webhook ended this subscription; null when the subscription was never
+	 * canceled (or the reason wasn't supplied).
+	 *
+	 * @see \Vatly\API\Types\CancellationReason
+	 */
+	public function getCancellationReason(): ?string {
+		return $this->cancellationReason;
 	}
 }
