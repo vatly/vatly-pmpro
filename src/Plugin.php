@@ -79,6 +79,12 @@ final class Plugin {
 		GatewaySettings::init();
 		LevelOptions::init();
 
+		// Surface Vatly's Merchant-of-Record invoice link on the member- and
+		// admin-facing order views. Registered unconditionally (not gated on the
+		// active gateway) so historical Vatly orders keep their link even after
+		// the merchant switches gateways.
+		\Vatly\PMPro\Gateway\InvoiceSurface::register();
+
 		$this->booted = true;
 	}
 

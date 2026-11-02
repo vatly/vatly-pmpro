@@ -10,8 +10,6 @@ use Vatly\Fluent\Contracts\EventDispatcherInterface;
 use Vatly\Fluent\Contracts\OrderRepositoryInterface;
 use Vatly\Fluent\Contracts\SubscriptionRepositoryInterface;
 use Vatly\Fluent\Contracts\WebhookCallRepositoryInterface;
-use Vatly\API\VatlyApiClient;
-use Vatly\API\Webhooks\WebhookEventFactory;
 use Vatly\Fluent\Actions\CancelSubscription;
 use Vatly\Fluent\Actions\GetCheckout;
 use Vatly\Fluent\Actions\GetOrder;
@@ -31,9 +29,11 @@ use Vatly\PMPro\Repositories\WebhookCallRepository;
 use Vatly\PMPro\Webhooks\EventDispatcher;
 use Vatly\PMPro\Webhooks\Reactions\AssignMembershipLevelOnStarted;
 use Vatly\PMPro\Webhooks\Reactions\ChangeMembershipLevelOnUpdated;
+use Vatly\PMPro\Webhooks\Reactions\MarkOrderRefundedOnRefund;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
+use Vatly\PMPro\Webhooks\Reactions\StoreInvoiceLinkOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
@@ -162,16 +162,18 @@ class Container {
 				$dispatcher    = $c->get( EventDispatcherInterface::class );
 				$webhookCalls  = $c->get( WebhookCallRepositoryInterface::class );
 				$get_order     = $c->get( GetOrder::class );
-				$api_client    = $c->get( Vatly::class )->getApiClient();
+				$vatly         = $c->get( Vatly::class );
 
 				return new WebhookProcessor(
-					// fluent v0.8.0-alpha.19 builds every typed event directly
-					// from the signed webhook payload — the WebhookEventFactory
-					// hydrates the money/tax-bearing events from `$webhook->object`
-					// and no longer issues follow-up `Get*` API calls. It just
-					// needs the VatlyApiClient (sourced from the Vatly composition
-					// root) to construct api-php Resource objects.
-					eventFactory: new WebhookEventFactory( $api_client ),
+					// Let the fluent facade build and own the event factory
+					// rather than reaching into api-php for the raw
+					// `WebhookEventFactory` + `VatlyApiClient`. The facade still
+					// hydrates every typed event directly from the signed webhook
+					// payload (no follow-up `Get*` calls); sourcing it through the
+					// accessor keeps the driver off api-php internals and
+					// insulated from the factory's constructor shape, which is the
+					// kind of thing that drifts between fluent releases.
+					eventFactory: $vatly->getWebhookEventFactory(),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
 					webhookSecret: $config->getWebhookSecret() ?? '',
@@ -194,6 +196,11 @@ class Container {
 						new ResumeSubscriptionOnResumed( $subscriptions ),
 						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
+						// Capture Vatly's Merchant-of-Record invoice URL onto the
+						// just-written order row. Runs after PMProStoreOrderOnPaid
+						// so the row exists; the URL comes from the Vatly order's
+						// links.customerInvoice (not on the OrderPaid event).
+						new StoreInvoiceLinkOnPaid( $orders, $get_order ),
 						// PMPro-specific level + subscription wiring.
 						new AssignMembershipLevelOnStarted( $bindings ),
 						// Immediate plan change: move the member to the level
@@ -207,19 +214,23 @@ class Container {
 						// via the enriched customer binding (falling back to the
 						// disputed order row keyed off `originalOrderId`).
 						new SuspendMembershipOnChargeback( $bindings, $orders ),
+						// Reflect a Vatly-issued refund (credit note) onto the
+						// originating PMPro order — status → refunded. Membership
+						// is intentionally left intact (a refund may be partial).
+						new MarkOrderRefundedOnRefund( $orders ),
 						new WriteOrderRowOnPaid( $bindings, $orders ),
 					],
 				);
 			}
 		);
 
-		// Action shortcuts. fluent exposes most via accessors on the facade,
-		// but registering them here lets CheckoutProcessor resolve uniformly
-		// and lets tests swap any single action without mocking the whole
-		// Vatly facade. GetCheckout in particular has no facade accessor.
+		// Action shortcuts. fluent exposes these via accessors on the facade;
+		// registering them here lets CheckoutProcessor resolve uniformly and
+		// lets tests swap any single action without mocking the whole Vatly
+		// facade.
 		$this->set(
 			GetCheckout::class,
-			static fn( Container $c ): GetCheckout => new GetCheckout( $c->get( Vatly::class )->getApiClient() )
+			static fn( Container $c ): GetCheckout => $c->get( Vatly::class )->getCheckout()
 		);
 		$this->set(
 			CancelSubscription::class,

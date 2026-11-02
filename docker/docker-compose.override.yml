@@ -1,0 +1,11 @@
+# Local demo override: the sibling vatly-fluentcart stack already holds
+# host ports 8080/8081, so this stack is remapped to 8090/8091.
+# `!override` replaces the base port list instead of concatenating with it.
+# Untracked, worktree-local — safe to delete.
+services:
+  wordpress:
+    ports: !override
+      - "8090:80"
+  mock-vatly:
+    ports: !override
+      - "8091:8080"

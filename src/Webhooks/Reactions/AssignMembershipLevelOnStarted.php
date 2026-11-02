@@ -71,7 +71,7 @@ class AssignMembershipLevelOnStarted implements WebhookReactionInterface {
 
 		$level_id = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT membership_id FROM {$wpdb->pmpro_membership_levelmeta}
+				"SELECT pmpro_membership_level_id FROM {$wpdb->pmpro_membership_levelmeta}
 					WHERE meta_key = %s AND meta_value = %s
 					LIMIT 1",
 				SubscriptionRepository::LEVEL_META_PLAN_ID,

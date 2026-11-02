@@ -276,7 +276,7 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface {
 
 		$level_id = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT pmml.membership_id
+				"SELECT pmml.pmpro_membership_level_id
 				 FROM {$wpdb->pmpro_membership_levelmeta} pmml
 				 WHERE pmml.meta_key = %s AND pmml.meta_value = %s
 				 LIMIT 1",
