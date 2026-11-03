@@ -1,6 +1,6 @@
 {
     "name": "vatly/vatly-gateway-for-paid-memberships-pro",
-    "description": "Vatly merchant-of-record payment gateway for Paid Memberships Pro. Stop maintaining your own VAT logic.",
+    "description": "Paid Memberships Pro payment gateway for Vatly, the Merchant of Record for European software and digital products. Stop maintaining your own VAT logic.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "homepage": "https://vatly.com",
