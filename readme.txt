@@ -31,7 +31,11 @@ Vatly is the Merchant of Record for European software and digital products, paid
 
 = Does this replace the pmpro-vat-tax addon? =
 
-Yes. With Vatly as the merchant of record, your PMPro site shows the all-in price and Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+Yes. With Vatly as the merchant of record, Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+
+= Which price do members pay? =
+
+The price on the Vatly plan you map to a level, not the PMPro level price. Set both to the same amount so your pricing page matches checkout. Selling to consumers? Create the plan as tax-inclusive: buyers pay exactly the price you show, and the VAT comes out of it. Tax-exclusive plans (the default) add VAT at checkout, so show prices as "excl. VAT".
 
 = What payment methods are supported? =
 

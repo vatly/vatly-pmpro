@@ -41,6 +41,7 @@ final class LevelOptions {
 					<td>
 						<input type="text" id="pmpro_vatly_plan_id" name="pmpro_vatly_plan_id" value="<?php echo esc_attr( $plan_id ); ?>" class="regular-text" />
 						<p class="description"><?php esc_html_e( 'Paste the plan_xxx id from your Vatly dashboard. Required for members on this level to be billed through Vatly.', 'vatly-pmpro' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Members pay the Vatly plan price, not this level\'s price, so keep them the same. Selling to consumers? Use a tax-inclusive plan; tax-exclusive plans add VAT at checkout.', 'vatly-pmpro' ); ?></p>
 					</td>
 				</tr>
 			</tbody>

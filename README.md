@@ -8,8 +8,7 @@
 > Stop maintaining your own VAT logic. Vatly is the Merchant of Record for
 > European software and digital products: it is the legal seller on every
 > sale and handles payments, tax and compliance, in every country, at every
-> rate, on every renewal. Your PMPro site shows the all-in price, Vatly
-> handles the VAT split, and you never write a `pmpro_tax` filter snippet again.
+> rate, on every renewal. You never write a `pmpro_tax` filter snippet again.
 
 A WordPress plugin that adds **Vatly** as a payment gateway to
 [Paid Memberships Pro](https://wordpress.org/plugins/paid-memberships-pro/),
@@ -152,6 +151,17 @@ case where the user returns to your site before the webhook arrives.
 Per-level setup:
 
 - Edit a PMPro level → scroll to **Vatly Plan** → paste the `plan_xxx` id.
+
+### Pricing and VAT
+
+Members pay the price on the Vatly plan you map to a level, not the PMPro
+level price. Set both to the same amount so your pricing page matches
+checkout.
+
+Selling to consumers? Create the plan as tax-inclusive: buyers pay exactly
+the price you show, and the VAT comes out of it. Tax-exclusive plans (the
+default) add VAT at checkout, so show prices as "excl. VAT". A plan's tax
+behaviour can't be changed after it is created.
 
 ### Test vs live (per-record)
 
