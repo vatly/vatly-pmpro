@@ -27,8 +27,16 @@ use Vatly\PMPro\Repositories\OrderModel;
  * to our `payment_transaction_id`. Find-or-skip: a refund for an order we don't
  * track is a no-op rather than a 500. Replay-safe: already-`refunded` orders are
  * left untouched.
+ *
+ * We also stamp the credit-note order id (`RefundCompleted::$orderId`, the credit
+ * order Vatly materializes for the refund) onto the PMPro order so the invoice
+ * surface can resolve a fresh, signed credit-note link at display time. We store
+ * the id, never the signed URL on the event — that URL expires after 72h.
  */
 class MarkOrderRefundedOnRefund implements WebhookReactionInterface {
+
+	/** PMPro order meta key: the Vatly credit-note order id for a refund. */
+	public const ORDER_META_CREDIT_NOTE_ORDER_ID = 'vatly_credit_note_order_id';
 
 	public function __construct(
 		private OrderRepositoryInterface $orders,
@@ -49,10 +57,33 @@ class MarkOrderRefundedOnRefund implements WebhookReactionInterface {
 			return;
 		}
 
+		$this->stamp_credit_note_order_id( $order, $event );
+
 		if ( $order->getStatus() === 'refunded' ) {
 			return;
 		}
 
 		$this->orders->update( $order, new UpdateOrderData( status: 'refunded' ) );
+	}
+
+	/**
+	 * Persist the credit-note order id so the invoice surface can link to the
+	 * credit note later. Stamped before the already-refunded short-circuit so a
+	 * replay that first carries the id still captures it.
+	 */
+	private function stamp_credit_note_order_id( OrderModel $order, RefundCompleted $event ): void {
+		if ( $event->orderId === null || $event->orderId === '' || $order->id === 0 ) {
+			return;
+		}
+
+		if ( ! function_exists( 'update_pmpro_membership_order_meta' ) ) {
+			return;
+		}
+
+		update_pmpro_membership_order_meta(
+			$order->id,
+			self::ORDER_META_CREDIT_NOTE_ORDER_ID,
+			$event->orderId
+		);
 	}
 }

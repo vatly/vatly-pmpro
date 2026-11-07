@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro\Tests\Unit\Webhooks\Reactions;
 
+use Brain\Monkey\Functions;
 use Vatly\API\Types\Money;
 use Vatly\API\Types\TaxSummaryCollection;
 use Vatly\API\Webhooks\Events\RefundCompleted;
@@ -73,7 +74,35 @@ class MarkOrderRefundedOnRefundTest extends TestCase {
 		self::assertSame( 'refunded', $order->getStatus() );
 	}
 
-	private function refund(): RefundCompleted {
+	public function test_stamps_credit_note_order_id_as_order_meta(): void {
+		$order  = $this->order( 'success' );
+		$orders = \Mockery::mock( OrderRepositoryInterface::class );
+		$orders->shouldReceive( 'findByVatlyId' )->with( 'order_1' )->andReturn( $order );
+		$orders->shouldReceive( 'update' )->once()->andReturn( $order );
+
+		Functions\expect( 'update_pmpro_membership_order_meta' )
+			->once()
+			->with( 5, MarkOrderRefundedOnRefund::ORDER_META_CREDIT_NOTE_ORDER_ID, 'credit_order_1' );
+
+		( new MarkOrderRefundedOnRefund( $orders ) )->handle( $this->refund( 'credit_order_1' ) );
+
+		$this->assertHookExpectations();
+	}
+
+	public function test_does_not_stamp_credit_note_when_event_has_no_credit_order(): void {
+		$order  = $this->order( 'success' );
+		$orders = \Mockery::mock( OrderRepositoryInterface::class );
+		$orders->shouldReceive( 'findByVatlyId' )->with( 'order_1' )->andReturn( $order );
+		$orders->shouldReceive( 'update' )->once()->andReturn( $order );
+
+		Functions\expect( 'update_pmpro_membership_order_meta' )->never();
+
+		( new MarkOrderRefundedOnRefund( $orders ) )->handle( $this->refund() );
+
+		$this->assertHookExpectations();
+	}
+
+	private function refund( ?string $creditOrderId = null ): RefundCompleted {
 		return new RefundCompleted(
 			customerId: 'cus_1',
 			refundId: 'refund_1',
@@ -83,6 +112,7 @@ class MarkOrderRefundedOnRefundTest extends TestCase {
 			taxSummary: new TaxSummaryCollection( [] ),
 			originalOrderId: 'order_1',
 			testmode: true,
+			orderId: $creditOrderId,
 		);
 	}
 

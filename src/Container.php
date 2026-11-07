@@ -33,7 +33,6 @@ use Vatly\PMPro\Webhooks\Reactions\MarkOrderRefundedOnRefund;
 use Vatly\PMPro\Webhooks\Reactions\PMProStoreOrderOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\ReinstateMembershipLevelOnResumed;
 use Vatly\PMPro\Webhooks\Reactions\RevokeMembershipLevelOnCanceled;
-use Vatly\PMPro\Webhooks\Reactions\StoreInvoiceLinkOnPaid;
 use Vatly\PMPro\Webhooks\Reactions\SuspendMembershipOnChargeback;
 use Vatly\PMPro\Webhooks\Reactions\WriteOrderRowOnPaid;
 
@@ -196,11 +195,6 @@ class Container {
 						new ResumeSubscriptionOnResumed( $subscriptions ),
 						// PMPro-specific replacement for fluent's StoreOrderOnPaid.
 						new PMProStoreOrderOnPaid( $orders, $bindings, $get_order ),
-						// Capture Vatly's Merchant-of-Record invoice URL onto the
-						// just-written order row. Runs after PMProStoreOrderOnPaid
-						// so the row exists; the URL comes from the Vatly order's
-						// links.customerInvoice (not on the OrderPaid event).
-						new StoreInvoiceLinkOnPaid( $orders, $get_order ),
 						// PMPro-specific level + subscription wiring.
 						new AssignMembershipLevelOnStarted( $bindings ),
 						// Immediate plan change: move the member to the level
