@@ -8,11 +8,11 @@ Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Sell PMPro memberships through Vatly, the Merchant of Record for European software and digital products. Vatly handles payments, tax and compliance.
+Sell PMPro memberships through Vatly, the European Merchant of Record for AI, software and digital products. Vatly handles payments, tax and compliance.
 
 == Description ==
 
-Vatly is the Merchant of Record for European software and digital products, paid memberships included. It is the legal seller on every sale and handles payments, tax and compliance. This plugin adds Vatly as a gateway option to Paid Memberships Pro, so:
+Vatly is the European Merchant of Record for AI, software and digital products, paid memberships included. It is the legal seller on every sale and handles payments, tax and compliance. This plugin adds Vatly as a gateway option to Paid Memberships Pro, so:
 
 * Your customers pay at Vatly's hosted checkout (cards, PayPal, iDEAL, Apple Pay, SEPA).
 * Vatly collects VAT per country, applies the right rate, and issues compliant invoices as the seller.

@@ -5,8 +5,8 @@
 [![Tests](https://img.shields.io/badge/tests-PHPUnit-orange.svg)](#testing)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
-> Stop maintaining your own VAT logic. Vatly is the Merchant of Record for
-> European software and digital products: it is the legal seller on every
+> Stop maintaining your own VAT logic. Vatly is the European Merchant of Record
+> for AI, software and digital products: it is the legal seller on every
 > sale and handles payments, tax and compliance, in every country, at every
 > rate, on every renewal. You never write a `pmpro_tax` filter snippet again.
 
