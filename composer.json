@@ -13,7 +13,8 @@
         "vat",
         "eu-vat",
         "merchant-of-record",
-        "payment-gateway"
+        "payment-gateway",
+        "ai"
     ],
     "authors": [
         {
