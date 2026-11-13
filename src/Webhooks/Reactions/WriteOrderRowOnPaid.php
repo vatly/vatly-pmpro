@@ -20,10 +20,12 @@ use Vatly\PMPro\Repositories\SubscriptionRepository;
  * it to attach the subscription link — handy for `pmpro_subscriptions →
  * pmpro_membership_orders` joins in admin views.
  *
- * Looking up the subscription by the user means we don't need fluent to
- * expose a subscription id on the `OrderPaid` event (it doesn't); a single
- * user has at most one active Vatly subscription in the PMPro model, so the
- * most-recent active row wins.
+ * The subscription comes from the order's own lines: each line carries
+ * `relatedResources.subscriptionId`, the subscription it belongs to. Lines
+ * that predate that field, an initial signup line whose subscription Vatly
+ * has not created yet, and orders whose lines name more than one subscription
+ * fall back to the member's most recent Vatly subscription row (active rows
+ * first), since a PMPro member has at most one active Vatly subscription.
  */
 class WriteOrderRowOnPaid implements WebhookReactionInterface {
 
@@ -50,18 +52,7 @@ class WriteOrderRowOnPaid implements WebhookReactionInterface {
 			return;
 		}
 
-		$host_id = $this->bindings->hostCustomerIdFor( $event->customerId );
-
-		if ( $host_id === null ) {
-			return;
-		}
-
-		$user_id = (int) $host_id;
-		if ( $user_id <= 0 ) {
-			return;
-		}
-
-		$subscription_vatly_id = $this->latest_subscription_id_for_user( $user_id );
+		$subscription_vatly_id = $this->subscription_id_from_lines( $event ) ?? $this->subscription_id_for_customer( $event->customerId );
 
 		if ( $subscription_vatly_id === null ) {
 			return;
@@ -78,6 +69,39 @@ class WriteOrderRowOnPaid implements WebhookReactionInterface {
 			[ '%s' ],
 			[ '%s', '%s' ]
 		);
+	}
+
+	/**
+	 * The one subscription the order's lines name, or null when they name
+	 * none or several.
+	 */
+	private function subscription_id_from_lines( OrderPaid $event ): ?string {
+		$ids = [];
+
+		foreach ( $event->lines as $line ) {
+			$id = $line->relatedResources?->subscriptionId;
+
+			if ( $id !== null && $id !== '' ) {
+				$ids[ $id ] = true;
+			}
+		}
+
+		return count( $ids ) === 1 ? (string) array_key_first( $ids ) : null;
+	}
+
+	private function subscription_id_for_customer( string $customer_id ): ?string {
+		$host_id = $this->bindings->hostCustomerIdFor( $customer_id );
+
+		if ( $host_id === null ) {
+			return null;
+		}
+
+		$user_id = (int) $host_id;
+		if ( $user_id <= 0 ) {
+			return null;
+		}
+
+		return $this->latest_subscription_id_for_user( $user_id );
 	}
 
 	/**

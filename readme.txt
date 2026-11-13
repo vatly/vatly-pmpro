@@ -1,6 +1,6 @@
 === Vatly Gateway for Paid Memberships Pro ===
 Contributors: vatly
-Tags: paid memberships pro, pmpro, vat, eu vat, payment gateway, merchant of record
+Tags: paid memberships pro, vat, eu vat, payment gateway, merchant of record
 Requires at least: 6.5
 Tested up to: 6.5
 Requires PHP: 8.1
@@ -8,14 +8,14 @@ Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Sell PMPro memberships through Vatly — the merchant of record that handles EU VAT, payment methods and recurring billing for you.
+Sell PMPro memberships through Vatly, the European Merchant of Record for AI, software and digital products. Vatly handles payments, tax and compliance.
 
 == Description ==
 
-Vatly is a merchant-of-record billing platform built for SaaS and membership sites. This plugin adds Vatly as a gateway option to Paid Memberships Pro, so:
+Vatly is the European Merchant of Record for AI, software and digital products, paid memberships included. It is the legal seller on every sale and handles payments, tax and compliance. This plugin adds Vatly as a gateway option to Paid Memberships Pro, so:
 
 * Your customers pay at Vatly's hosted checkout (cards, PayPal, iDEAL, Apple Pay, SEPA).
-* Vatly collects VAT per country, applies the right rate, and issues compliant invoices in your name.
+* Vatly collects VAT per country, applies the right rate, and issues compliant invoices as the seller.
 * PMPro continues to handle membership levels, content gating, member dashboards and discount codes.
 * Webhooks sync subscription state — levels are assigned on payment and revoked on cancellation.
 
@@ -31,7 +31,11 @@ Vatly is a merchant-of-record billing platform built for SaaS and membership sit
 
 = Does this replace the pmpro-vat-tax addon? =
 
-Yes. With Vatly as the merchant of record, your PMPro site shows the all-in price and Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+Yes. With Vatly as the merchant of record, Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+
+= Which price do members pay? =
+
+The price on the Vatly plan you map to a level, not the PMPro level price. Set both to the same amount so your pricing page matches checkout. Selling to consumers? Create the plan as tax-inclusive: buyers pay exactly the price you show, and the VAT comes out of it. Tax-exclusive plans (the default) add VAT at checkout, so show prices as "excl. VAT".
 
 = What payment methods are supported? =
 
