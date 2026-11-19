@@ -50,6 +50,11 @@ final class Plugin {
 
 		$this->load_textdomain();
 
+		// Upgrades without reactivation (e.g. replacing the plugin files)
+		// still get schema changes and encrypted secrets. Until then, plain
+		// values stored by earlier builds are still read.
+		add_action( 'admin_init', [ \Vatly\PMPro\Install\Migrations::class, 'run' ] );
+
 		if ( ! $this->pmpro_active() ) {
 			// No public webhook route without PMPro: there is nothing to
 			// update, and the gateway settings (webhook secret) are not shown.

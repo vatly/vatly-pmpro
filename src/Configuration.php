@@ -9,7 +9,8 @@ use Vatly\Fluent\Contracts\ConfigurationInterface;
 /**
  * Option-backed implementation of the fluent ConfigurationInterface.
  *
- * Reads from WordPress options. Defaults match Vatly's production API URL and
+ * Reads from WordPress options; the API keys and webhook secret are stored
+ * encrypted ({@see Secrets}). Defaults match Vatly's production API URL and
  * the current API version pinned by vatly/vatly-api-php.
  */
 class Configuration implements ConfigurationInterface {
@@ -28,13 +29,13 @@ class Configuration implements ConfigurationInterface {
 		// Honor PMPro's global gateway_environment so live/sandbox can be flipped
 		// from the main PMPro settings page just like every other gateway.
 		if ( $this->isTestmode() ) {
-			$key = (string) get_option( self::OPTION_API_KEY_TEST, '' );
+			$key = Secrets::reveal( get_option( self::OPTION_API_KEY_TEST, '' ) );
 			if ( $key !== '' ) {
 				return $key;
 			}
 		}
 
-		return (string) get_option( self::OPTION_API_KEY, '' );
+		return Secrets::reveal( get_option( self::OPTION_API_KEY, '' ) );
 	}
 
 	public function getApiUrl(): string {
@@ -48,7 +49,7 @@ class Configuration implements ConfigurationInterface {
 	}
 
 	public function getWebhookSecret(): ?string {
-		$secret = (string) get_option( self::OPTION_WEBHOOK_SECRET, '' );
+		$secret = Secrets::reveal( get_option( self::OPTION_WEBHOOK_SECRET, '' ) );
 
 		return $secret !== '' ? $secret : null;
 	}

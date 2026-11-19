@@ -6,6 +6,8 @@ namespace Vatly\PMPro\Tests\Integration;
 
 use Vatly\PMPro\Configuration;
 use Vatly\PMPro\Install\Activator;
+use Vatly\PMPro\Install\Migrations;
+use Vatly\PMPro\Secrets;
 use Vatly\PMPro\Webhooks\RestRoute;
 use WP_REST_Request;
 use WP_UnitTestCase;
@@ -105,6 +107,32 @@ class WebhookRouteTest extends WP_UnitTestCase {
 				$wpdb->prepare( "SELECT vatly_id FROM {$wpdb->prefix}vatly_webhook_calls WHERE vatly_id = %s", $event_id )
 			)
 		);
+	}
+
+	public function test_a_secret_encrypted_by_the_upgrade_still_verifies_webhooks(): void {
+		// setUp stored the secret in plain text, as earlier builds did.
+		delete_option( Migrations::DB_VERSION_OPTION );
+		Migrations::run();
+
+		$stored = (string) get_option( Configuration::OPTION_WEBHOOK_SECRET );
+		self::assertTrue( Secrets::is_encrypted( $stored ) );
+		self::assertStringNotContainsString( self::SECRET, $stored );
+
+		$payload   = (string) wp_json_encode(
+			[
+				'id'         => 'evt_test_' . uniqid(),
+				'resource'   => 'test',
+				'eventName'  => 'test.echo',
+				'entityType' => 'test',
+				'entityId'   => 'tst_1',
+				'testmode'   => true,
+				'createdAt'  => gmdate( 'c' ),
+			]
+		);
+		$timestamp = (string) time();
+		$signature = 't=' . $timestamp . ',v1=' . hash_hmac( 'sha256', $timestamp . '.' . $payload, self::SECRET );
+
+		self::assertSame( 200, $this->dispatch( $payload, $signature )->get_status() );
 	}
 
 	public function test_valid_signature_is_accepted_and_returns_200(): void {
