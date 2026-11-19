@@ -7,6 +7,8 @@ namespace Vatly\PMPro\Install;
 /**
  * Database migrations.
  *
+ * Runs on activation and on `admin_init`; it does nothing once DB_VERSION is stored.
+ *
  * Currently a single table: `wp_vatly_webhook_calls`. Holds an audit trail of
  * incoming webhook payloads — useful for debugging and replay during outages.
  * PMPro's own `pmpro_membership_orders` and `pmpro_subscriptions` cover order
@@ -15,7 +17,7 @@ namespace Vatly\PMPro\Install;
 final class Migrations {
 
 	public const DB_VERSION_OPTION = 'vatly_pmpro_db_version';
-	public const DB_VERSION        = '1.0.0';
+	public const DB_VERSION        = '1.1.0';
 
 	public static function run(): void {
 		global $wpdb;
@@ -53,6 +55,9 @@ final class Migrations {
 		) {$charset_collate};";
 
 		dbDelta( $sql );
+
+		// 1.1.0: encrypt API keys and the webhook secret stored in plain text.
+		\Vatly\PMPro\Secrets::encrypt_stored();
 
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, false );
 	}
