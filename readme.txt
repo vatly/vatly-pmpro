@@ -4,7 +4,7 @@ Tags: paid memberships pro, vat, eu vat, payment gateway, merchant of record
 Requires at least: 6.5
 Tested up to: 6.5
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ Cards, PayPal, iDEAL, Apple Pay, SEPA, and a growing list — Vatly enables them
 GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
 
 == Changelog ==
+
+= 0.3.0 =
+* Webhooks are refused until a secret is configured. While no webhook secret is saved, the webhook endpoint answers 503 and processes nothing; Vatly retries the delivery once the secret is saved. If your site has no webhook secret saved, save the secret from your Vatly dashboard in the gateway settings to keep receiving webhooks. The webhook endpoint is only registered while Paid Memberships Pro is active.
+* Requires vatly-fluent-php 0.8.0-alpha.32 (with vatly-api-php 0.1.0-alpha.36).
 
 = 0.2.0 =
 * Adopt vatly-fluent-php 0.8.0-alpha.23. Handle the new `subscription.updated` webhook: an immediate plan change now moves the member to the PMPro level mapped to the new plan (ChangeMembershipLevelOnUpdated), and the stored subscription row is kept in step. `subscription.update_scheduled` (a change queued for the next billing cycle) is exposed on the `vatly_pmpro_subscription_update_scheduled` action but does not change the level until it takes effect.
