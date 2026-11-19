@@ -75,6 +75,38 @@ class WebhookRouteTest extends WP_UnitTestCase {
 		self::assertSame( 400, $response->get_status() );
 	}
 
+	public function test_returns_503_and_records_nothing_while_no_secret_is_configured(): void {
+		delete_option( Configuration::OPTION_WEBHOOK_SECRET );
+
+		$event_id  = 'evt_test_' . uniqid();
+		$payload   = (string) wp_json_encode(
+			[
+				'id'         => $event_id,
+				'resource'   => 'test',
+				'eventName'  => 'test.echo',
+				'entityType' => 'test',
+				'entityId'   => 'tst_1',
+				'testmode'   => true,
+				'createdAt'  => gmdate( 'c' ),
+			]
+		);
+		$timestamp = (string) time();
+		// Signed with the empty key, so only the missing-secret check can refuse it.
+		$signature = 't=' . $timestamp . ',v1=' . hash_hmac( 'sha256', $timestamp . '.' . $payload, '' );
+
+		$response = $this->dispatch( $payload, $signature );
+
+		self::assertSame( 503, $response->get_status() );
+		self::assertSame( 'webhook_secret_not_configured', $response->get_data()['code'] ?? null );
+
+		global $wpdb;
+		self::assertNull(
+			$wpdb->get_row(
+				$wpdb->prepare( "SELECT vatly_id FROM {$wpdb->prefix}vatly_webhook_calls WHERE vatly_id = %s", $event_id )
+			)
+		);
+	}
+
 	public function test_valid_signature_is_accepted_and_returns_200(): void {
 		// Pick an event name fluent doesn't recognize — it'll dispatch an
 		// `UnsupportedWebhookReceived` event and skip every reaction. This
