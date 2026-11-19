@@ -38,6 +38,9 @@ require_once $_tests_dir . '/includes/functions.php';
 tests_add_filter(
 	'muplugins_loaded',
 	static function (): void {
+		// The plugin only boots its gateway and webhook route while PMPro is
+		// active; the PMPro class stubs stand in for the real plugin.
+		require_once dirname( __DIR__ ) . '/PMProStubs.php';
 		require dirname( __DIR__, 2 ) . '/vatly-gateway-for-paid-memberships-pro.php';
 	}
 );

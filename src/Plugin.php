@@ -50,13 +50,9 @@ final class Plugin {
 
 		$this->load_textdomain();
 
-		// The webhook listener is independent of PMPro — we want to receive and
-		// audit webhooks (and tests want to assert the route exists) regardless
-		// of whether PMPro is active. Reactions that touch PMPro internals
-		// short-circuit themselves when PMPro is missing.
-		( new RestRoute( $this->container ) )->register();
-
 		if ( ! $this->pmpro_active() ) {
+			// No public webhook route without PMPro: there is nothing to
+			// update, and the gateway settings (webhook secret) are not shown.
 			add_action( 'admin_notices', [ $this, 'render_missing_pmpro_notice' ] );
 			$this->booted = true;
 
@@ -70,6 +66,8 @@ final class Plugin {
 		// PMPro — and the conditional class definition inside the file would
 		// otherwise see `class_exists('PMProGateway') === false` and skip.
 		require_once dirname( __DIR__ ) . '/includes/class-pmprogateway-vatly.php';
+
+		( new RestRoute( $this->container ) )->register();
 
 		if ( class_exists( '\PMProGateway_vatly', false ) ) {
 			\PMProGateway_vatly::init( $this->container );

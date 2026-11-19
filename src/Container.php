@@ -174,6 +174,8 @@ class Container {
 					eventFactory: new WebhookEventFactory( $api_client ),
 					repository: $webhookCalls,
 					dispatcher: $dispatcher,
+					// A missing secret becomes '', which fluent refuses on every
+					// delivery; RestRoute answers 503 before getting here.
 					webhookSecret: $config->getWebhookSecret() ?? '',
 					reactions: [
 						// Built-in fluent reactions we keep as-is.
