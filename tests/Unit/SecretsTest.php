@@ -59,21 +59,10 @@ class SecretsTest extends TestCase {
 		self::assertSame('', Secrets::reveal('vatly-enc:v1:not-base64!'));
 	}
 
-	public function test_plain_values_from_earlier_builds_are_read_and_then_encrypted(): void {
-		$this->options[Configuration::OPTION_WEBHOOK_SECRET] = 'legacy_plain_secret';
-		$this->options[Configuration::OPTION_API_KEY_TEST]   = 'test_localdevkeyXXXXXXXXX';
+	public function test_a_plain_stored_value_is_not_used(): void {
+		$this->options[Configuration::OPTION_WEBHOOK_SECRET] = 'plain_value_written_outside_the_plugin';
 
-		self::assertSame('legacy_plain_secret', (new Configuration())->getWebhookSecret());
-
-		Secrets::encrypt_stored();
-		$once = $this->options[Configuration::OPTION_WEBHOOK_SECRET];
-		Secrets::encrypt_stored();
-
-		self::assertTrue(Secrets::is_encrypted($once));
-		self::assertSame($once, $this->options[Configuration::OPTION_WEBHOOK_SECRET], 'An encrypted value is not encrypted again.');
-		self::assertSame('legacy_plain_secret', (new Configuration())->getWebhookSecret());
-		self::assertSame('test_localdevkeyXXXXXXXXX', Secrets::reveal($this->options[Configuration::OPTION_API_KEY_TEST]));
-		self::assertArrayNotHasKey(Configuration::OPTION_API_KEY, $this->options, 'An unset option stays unset.');
+		self::assertNull((new Configuration())->getWebhookSecret());
 	}
 
 	/**

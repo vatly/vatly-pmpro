@@ -15,8 +15,8 @@ class ConfigurationTest extends TestCase {
 
 	public function test_returns_test_api_key_when_in_testmode(): void {
 		$opts = [
-			Configuration::OPTION_API_KEY_TEST            => 'test_localdevkeyXXXXXXXXX',
-			Configuration::OPTION_API_KEY                 => 'live_realkeyXXXXXXXXX',
+			Configuration::OPTION_API_KEY_TEST            => \Vatly\PMPro\Secrets::encrypt('test_localdevkeyXXXXXXXXX'),
+			Configuration::OPTION_API_KEY                 => \Vatly\PMPro\Secrets::encrypt('live_realkeyXXXXXXXXX'),
 			Configuration::OPTION_GATEWAY_ENVIRONMENT_KEY => 'sandbox',
 		];
 
@@ -27,7 +27,7 @@ class ConfigurationTest extends TestCase {
 
 	public function test_returns_live_api_key_when_in_live_mode(): void {
 		$opts = [
-			Configuration::OPTION_API_KEY                 => 'live_realkeyXXXXXXXXX',
+			Configuration::OPTION_API_KEY                 => \Vatly\PMPro\Secrets::encrypt('live_realkeyXXXXXXXXX'),
 			Configuration::OPTION_GATEWAY_ENVIRONMENT_KEY => 'live',
 		];
 
@@ -38,7 +38,7 @@ class ConfigurationTest extends TestCase {
 
 	public function test_falls_back_to_live_key_when_test_key_missing_in_testmode(): void {
 		$opts = [
-			Configuration::OPTION_API_KEY                 => 'live_realkeyXXXXXXXXX',
+			Configuration::OPTION_API_KEY                 => \Vatly\PMPro\Secrets::encrypt('live_realkeyXXXXXXXXX'),
 			Configuration::OPTION_API_KEY_TEST            => '',
 			Configuration::OPTION_GATEWAY_ENVIRONMENT_KEY => 'sandbox',
 		];
@@ -61,7 +61,7 @@ class ConfigurationTest extends TestCase {
 	}
 
 	public function test_webhook_secret_returns_value_when_set(): void {
-		$opts = [ Configuration::OPTION_WEBHOOK_SECRET => 'secret-abc' ];
+		$opts = [ Configuration::OPTION_WEBHOOK_SECRET => \Vatly\PMPro\Secrets::encrypt('secret-abc') ];
 		Functions\when('get_option')->alias(static fn(string $key, $default = '') => $opts[$key] ?? $default);
 
 		self::assertSame('secret-abc', (new Configuration())->getWebhookSecret());
