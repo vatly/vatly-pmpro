@@ -18,6 +18,16 @@ use Vatly\PMPro\Tests\TestCase;
  */
 class InvoiceSurfaceTest extends TestCase {
 
+	public function test_no_link_and_no_error_when_the_api_client_cannot_be_built(): void {
+		$surface = new InvoiceSurface(
+			static function (): GetOrder {
+				throw new \Vatly\API\Exceptions\ApiException( "Invalid API key: ''." );
+			}
+		);
+
+		self::assertSame( 'Thanks!', $surface->append_to_confirmation( 'Thanks!', $this->memberOrder() ) );
+	}
+
 	public function test_confirmation_is_unchanged_for_non_vatly_orders(): void {
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'get_pmpro_membership_order_meta' )->justReturn( '' );
@@ -25,7 +35,7 @@ class InvoiceSurfaceTest extends TestCase {
 		$getOrder = \Mockery::mock( GetOrder::class );
 		$getOrder->shouldNotReceive( 'execute' );
 
-		$surface = new InvoiceSurface( $getOrder );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
 		$order   = $this->memberOrder( gateway: 'stripe' );
 
 		self::assertSame( 'Thanks!', $surface->append_to_confirmation( 'Thanks!', $order ) );
@@ -40,7 +50,7 @@ class InvoiceSurfaceTest extends TestCase {
 		$getOrder->shouldReceive( 'execute' )->with( 'order_1' )
 			->andReturn( $this->apiOrder( 'order_1', 'https://vatly.test/invoice/order_1' ) );
 
-		$surface = new InvoiceSurface( $getOrder );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
 		$result  = $surface->append_to_confirmation( 'Thanks!', $this->memberOrder() );
 
 		self::assertStringContainsString( 'https://vatly.test/invoice/order_1', $result );
@@ -55,7 +65,7 @@ class InvoiceSurfaceTest extends TestCase {
 		$getOrder->shouldReceive( 'execute' )->with( 'order_1' )
 			->andReturn( $this->apiOrder( 'order_1', null ) );
 
-		$surface = new InvoiceSurface( $getOrder );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
 
 		self::assertSame( 'Thanks!', $surface->append_to_confirmation( 'Thanks!', $this->memberOrder() ) );
 	}
@@ -72,7 +82,7 @@ class InvoiceSurfaceTest extends TestCase {
 		$getOrder->shouldReceive( 'execute' )->with( 'credit_order_1' )
 			->andReturn( $this->apiOrder( 'credit_order_1', 'https://vatly.test/credit/credit_order_1' ) );
 
-		$surface = new InvoiceSurface( $getOrder );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
 		$result  = $surface->append_to_confirmation( 'Thanks!', $this->memberOrder() );
 
 		self::assertStringContainsString( 'https://vatly.test/credit/credit_order_1', $result );
@@ -99,7 +109,7 @@ class InvoiceSurfaceTest extends TestCase {
 		$getOrder->shouldReceive( 'execute' )->with( 'order_1' )->once()
 			->andReturn( $this->apiOrder( 'order_1', 'https://vatly.test/invoice/order_1' ) );
 
-		$surface = new InvoiceSurface( $getOrder );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
 		$surface->append_to_confirmation( 'Thanks!', $this->memberOrder() );
 		$second = $surface->append_to_confirmation( 'Thanks!', $this->memberOrder() );
 

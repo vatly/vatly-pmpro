@@ -32,7 +32,19 @@ final class InvoiceSurface {
 	/** How long a resolved, signed link is cached. Comfortably below Vatly's 72h expiry. */
 	private const CACHE_TTL = 3600;
 
-	public function __construct( private GetOrder $getOrder ) {}
+	/** @var callable(): GetOrder */
+	private $getOrder;
+
+	/**
+	 * Takes a resolver rather than the action: building {@see GetOrder}
+	 * builds the API client, which throws without a valid API key. Resolving
+	 * it only when a Vatly order is shown keeps sites without a key working.
+	 *
+	 * @param callable(): GetOrder $getOrder
+	 */
+	public function __construct( callable $getOrder ) {
+		$this->getOrder = $getOrder;
+	}
 
 	public function register(): void {
 		// Member: checkout confirmation message.
@@ -187,7 +199,7 @@ final class InvoiceSurface {
 		}
 
 		try {
-			$order = $this->getOrder->execute( $vatly_order_id );
+			$order = ( $this->getOrder )()->execute( $vatly_order_id );
 		} catch ( \Throwable $e ) {
 			return '';
 		}

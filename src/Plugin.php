@@ -85,8 +85,9 @@ final class Plugin {
 		// the member- and admin-facing order views. Registered unconditionally
 		// (not gated on the active gateway) so historical Vatly orders keep their
 		// link even after the merchant switches gateways. Resolves fresh signed
-		// links at display time via GetOrder, so it needs that action.
-		( new InvoiceSurface( $this->container->get( GetOrder::class ) ) )->register();
+		// links at display time via GetOrder, resolved lazily: building it
+		// needs a valid API key, which a freshly installed site may not have.
+		( new InvoiceSurface( fn(): GetOrder => $this->container->get( GetOrder::class ) ) )->register();
 
 		$this->booted = true;
 	}
