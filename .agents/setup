@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Amp orb setup: PHP, MySQL or MariaDB, Composer deps, and a WordPress + PMPro dev site
+# wired to the mock Vatly server (see .amp/services.yaml and docker/README.md).
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+[[ "${AMP_ORB:-}" == 1 ]] || { echo 'This setup is for disposable Amp orbs only.' >&2; exit 1; }
+export DEBIAN_FRONTEND=noninteractive
+
+site="$HOME/vatly-pmpro-site"
+bin="$HOME/.local/bin"
+mkdir -p "$bin"
+export PATH="$bin:$PATH"
+
+step() { echo "==> $* ($(date +%T))"; }
+
+step 'System packages'
+missing=()
+command -v php >/dev/null || missing+=(php-cli)
+for ext in mysqli curl mbstring dom zip intl bcmath; do
+	php -m 2>/dev/null | grep -qix "$ext" || missing+=("php-${ext/dom/xml}")
+done
+# Reuse any MySQL or MariaDB server already here; never replace one.
+PATH="$PATH:/usr/sbin" command -v mariadbd >/dev/null || PATH="$PATH:/usr/sbin" command -v mysqld >/dev/null \
+	|| dpkg-query -W -f='${Status}' mysql-community-server mysql-server mariadb-server 2>/dev/null | grep -q 'ok installed' \
+	|| missing+=(mariadb-server)
+command -v composer >/dev/null || missing+=(composer)
+command -v svn >/dev/null || missing+=(subversion) # bin/install-wp-tests.sh
+if ((${#missing[@]})); then
+	sudo apt-get update -qq
+	sudo -E apt-get install -y --no-install-recommends "${missing[@]}"
+fi
+
+step 'Composer dependencies'
+composer install --no-interaction --no-progress
+
+step 'Database'
+sudo service mariadb start >/dev/null 2>&1 || sudo service mysql start >/dev/null
+sudo mysql -e "CREATE DATABASE IF NOT EXISTS vatly_pmpro_dev; CREATE DATABASE IF NOT EXISTS wordpress_test;
+	CREATE USER IF NOT EXISTS 'vatly'@'localhost' IDENTIFIED BY 'vatly';
+	CREATE USER IF NOT EXISTS 'vatly'@'127.0.0.1' IDENTIFIED BY 'vatly';
+	GRANT ALL ON vatly_pmpro_dev.* TO 'vatly'@'localhost'; GRANT ALL ON vatly_pmpro_dev.* TO 'vatly'@'127.0.0.1';
+	GRANT ALL ON wordpress_test.* TO 'vatly'@'localhost'; GRANT ALL ON wordpress_test.* TO 'vatly'@'127.0.0.1';"
+
+step 'WP-CLI and WordPress'
+[ -x "$bin/wp" ] || { curl -fsSL -o "$bin/wp" https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar; chmod +x "$bin/wp"; }
+[ -f "$site/wp-load.php" ] || wp core download --path="$site" --quiet
+if [ ! -f "$site/wp-config.php" ]; then
+	wp config create --path="$site" --dbname=vatly_pmpro_dev --dbuser=vatly --dbpass=vatly --dbhost=127.0.0.1 --quiet --extra-php <<'PHP'
+// The site answers on localhost and on Amp portal hosts alike.
+if ( ( $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '' ) === 'https' ) {
+	$_SERVER['HTTPS'] = 'on';
+}
+if ( ! empty( $_SERVER['HTTP_HOST'] ) ) {
+	define( 'WP_HOME', ( empty( $_SERVER['HTTPS'] ) ? 'http' : 'https' ) . '://' . $_SERVER['HTTP_HOST'] );
+	define( 'WP_SITEURL', WP_HOME );
+}
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', '/tmp/vatly-pmpro-debug.log' );
+define( 'WP_DEBUG_DISPLAY', false );
+PHP
+fi
+wp core is-installed --path="$site" 2>/dev/null || wp core install --path="$site" --url=http://localhost:8090 \
+	--title='Vatly PMPro dev' --admin_user=admin --admin_password=admin --admin_email=admin@example.com --skip-email
+ln -sfn "$root" "$site/wp-content/plugins/vatly-gateway-for-paid-memberships-pro"
+
+step 'PMPro, gateway settings and sample level'
+WP_PATH="$site" SITE_URL=http://localhost:8090 MOCK_VATLY=http://localhost:8091 sh docker/setup.sh
+
+step 'Done'

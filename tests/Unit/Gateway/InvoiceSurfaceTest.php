@@ -18,6 +18,38 @@ use Vatly\PMPro\Tests\TestCase;
  */
 class InvoiceSurfaceTest extends TestCase {
 
+	public function test_admin_screens_link_the_invoice_on_view_and_edit(): void {
+		$getOrder = \Mockery::mock( GetOrder::class );
+		$getOrder->shouldReceive( 'execute' )->with( 'order_1' )
+			->andReturn( $this->apiOrder( 'order_1', 'https://vatly.test/invoice/order_1' ) );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
+
+		ob_start();
+		$surface->render_admin_view_section( $this->memberOrder() );
+		$view = (string) ob_get_clean();
+
+		ob_start();
+		$surface->render_admin_edit_rows( $this->memberOrder() );
+		$edit = (string) ob_get_clean();
+
+		self::assertStringContainsString( 'https://vatly.test/invoice/order_1', $view );
+		self::assertStringContainsString( 'class="pmpro_section"', $view );
+		self::assertStringContainsString( 'https://vatly.test/invoice/order_1', $edit );
+		self::assertStringStartsWith( '<tr>', $edit, 'The edit form hook runs inside a <tbody>.' );
+	}
+
+	public function test_admin_screens_render_nothing_for_other_gateways(): void {
+		$getOrder = \Mockery::mock( GetOrder::class );
+		$getOrder->shouldNotReceive( 'execute' );
+		$surface = new InvoiceSurface( static fn() => $getOrder );
+
+		ob_start();
+		$surface->render_admin_view_section( $this->memberOrder( gateway: 'stripe' ) );
+		$surface->render_admin_edit_rows( $this->memberOrder( gateway: 'stripe' ) );
+
+		self::assertSame( '', ob_get_clean() );
+	}
+
 	public function test_no_link_and_no_error_when_the_api_client_cannot_be_built(): void {
 		$surface = new InvoiceSurface(
 			static function (): GetOrder {

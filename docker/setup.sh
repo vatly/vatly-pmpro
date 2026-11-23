@@ -9,17 +9,22 @@
 
 set -e
 
-PLUGIN_DIR="/var/www/html/wp-content/plugins/vatly-gateway-for-paid-memberships-pro"
+WP_PATH="${WP_PATH:-/var/www/html}"
+PLUGIN_DIR="$WP_PATH/wp-content/plugins/vatly-gateway-for-paid-memberships-pro"
 SITE_URL="${SITE_URL:-http://localhost:8080}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 MOCK_VATLY="${MOCK_VATLY:-http://mock-vatly:8080}"
 
-cd /var/www/html
+cd "$WP_PATH"
 
 wp_run() {
-	wp --allow-root "$@"
+	if [ "$(id -u)" = 0 ]; then
+		wp --allow-root "$@"
+	else
+		wp "$@"
+	fi
 }
 
 if ! wp_run core is-installed >/dev/null 2>&1; then
@@ -36,13 +41,14 @@ fi
 wp_run rewrite structure '/%postname%/' --hard
 wp_run rewrite flush --hard
 
-# Install + activate PMPro.
+# Install + activate PMPro. PMPro left WordPress.org in 2024, so install the
+# latest GitHub release; WP-CLI names the folder after the plugin slug.
 if ! wp_run plugin is-installed paid-memberships-pro; then
-	echo "==> Installing Paid Memberships Pro"
-	wp_run plugin install paid-memberships-pro --activate
-else
-	wp_run plugin is-active paid-memberships-pro || wp_run plugin activate paid-memberships-pro
+	PMPRO_TAG=$(wp_run eval 'echo basename( (string) wp_remote_retrieve_header( wp_remote_head( "https://github.com/strangerstudios/paid-memberships-pro/releases/latest", [ "redirection" => 0 ] ), "location" ) );')
+	echo "==> Installing Paid Memberships Pro ${PMPRO_TAG}"
+	wp_run plugin install "https://github.com/strangerstudios/paid-memberships-pro/archive/refs/tags/${PMPRO_TAG}.zip"
 fi
+wp_run plugin is-active paid-memberships-pro || wp_run plugin activate paid-memberships-pro
 
 # Install plugin composer deps if vendor is missing.
 if [ ! -d "$PLUGIN_DIR/vendor" ]; then
@@ -62,6 +68,15 @@ wp_run option update vatly_pmpro_api_url "$MOCK_VATLY"
 wp_run eval '\Vatly\PMPro\Secrets::store( "vatly_pmpro_webhook_secret", "mock-secret-for-dev-only-do-not-use-in-prod" );'
 wp_run option update pmpro_currency EUR
 
+# PMPro's setup wizard normally creates its pages; a WP-CLI install has to.
+if [ -z "$(wp_run option get pmpro_checkout_page_id 2>/dev/null)" ]; then
+	echo "==> Creating PMPro pages"
+	wp_run eval 'pmpro_generatePages( [ "account" => "Membership Account", "billing" => "Membership Billing", "cancel" => "Membership Cancel", "checkout" => "Membership Checkout", "confirmation" => "Membership Confirmation", "invoice" => "Membership Orders", "levels" => "Membership Levels", "login" => "Log In", "member_profile_edit" => "Your Profile" ] );'
+	wp_run rewrite flush --hard
+fi
+# Settings are wired above, so skip the wizard PMPro opens on first admin login.
+wp_run option delete pmpro_wizard_redirect >/dev/null 2>&1 || true
+
 # Seed a recurring membership level mapped to a known mock plan id.
 if ! wp_run pmpro level get 1 >/dev/null 2>&1; then
 	echo "==> Creating sample membership level"
@@ -78,8 +93,8 @@ esac
 
 if [ -n "$LEVEL_ID" ]; then
 	echo "==> Mapping level $LEVEL_ID to Vatly plan plan_local_dev"
-	wp_run db query "DELETE FROM wp_pmpro_membership_levelmeta WHERE membership_id=${LEVEL_ID} AND meta_key='pmpro_vatly_plan_id'"
-	wp_run db query "INSERT INTO wp_pmpro_membership_levelmeta (membership_id, meta_key, meta_value) VALUES (${LEVEL_ID}, 'pmpro_vatly_plan_id', 'plan_local_dev')"
+	wp_run db query "DELETE FROM wp_pmpro_membership_levelmeta WHERE pmpro_membership_level_id=${LEVEL_ID} AND meta_key='pmpro_vatly_plan_id'"
+	wp_run db query "INSERT INTO wp_pmpro_membership_levelmeta (pmpro_membership_level_id, meta_key, meta_value) VALUES (${LEVEL_ID}, 'pmpro_vatly_plan_id', 'plan_local_dev')"
 fi
 
 echo
@@ -88,5 +103,5 @@ echo "    Site:        $SITE_URL"
 echo "    Admin login: $ADMIN_USER / $ADMIN_PASS"
 echo "    Mock Vatly:  $MOCK_VATLY  (browser: http://localhost:8081)"
 echo
-echo "    Try a checkout: $SITE_URL/membership-account/membership-checkout/?level=$LEVEL_ID"
+echo "    Try a checkout: $SITE_URL/membership-checkout/?pmpro_level=$LEVEL_ID"
 echo "    Webhook URL:    $SITE_URL/wp-json/vatly/v1/webhook"

@@ -31,6 +31,9 @@ class OrderRepository implements OrderRepositoryInterface {
 
 	public const GATEWAY = 'vatly';
 
+	private const META_INVOICE_NUMBER = 'vatly_invoice_number';
+	private const META_CURRENCY       = 'vatly_currency';
+
 	public function findByVatlyId( string $vatlyId ): ?OrderInterface {
 		global $wpdb;
 
@@ -86,7 +89,7 @@ class OrderRepository implements OrderRepositoryInterface {
 				'subtotal'                    => $subtotal,
 				'tax'                         => $tax,
 				'total'                       => $total,
-				'notes'                       => $this->build_notes( $data->invoiceNumber, $data->currency ),
+				'notes'                       => '',
 				'timestamp'                   => current_time( 'mysql', true ),
 				'accountnumber'               => '',
 				'cardtype'                    => '',
@@ -115,7 +118,10 @@ class OrderRepository implements OrderRepositoryInterface {
 			]
 		);
 
-		return $this->find_by_id( (int) $wpdb->insert_id );
+		$id = (int) $wpdb->insert_id;
+		$this->store_meta( $id, $data->invoiceNumber, $data->currency );
+
+		return $this->find_by_id( $id );
 	}
 
 	public function update( OrderInterface $order, UpdateOrderData $data ): OrderInterface {
@@ -157,13 +163,7 @@ class OrderRepository implements OrderRepositoryInterface {
 			$format[]      = '%s';
 		}
 
-		if ( $data->invoiceNumber !== null || $data->currency !== null ) {
-			$update['notes'] = $this->build_notes(
-				$data->invoiceNumber ?? $order->invoiceNumber,
-				$currency
-			);
-			$format[]        = '%s';
-		}
+		$this->store_meta( $order->id, $data->invoiceNumber, $data->currency );
 
 		if ( ! empty( $update ) ) {
 			$wpdb->update(
@@ -184,15 +184,17 @@ class OrderRepository implements OrderRepositoryInterface {
 	private function hydrate( $row ): OrderModel {
 		$row = (array) $row;
 
-		$notes                         = (string) ( $row['notes'] ?? '' );
-		[ $invoice_number, $currency ] = $this->parse_notes( $notes );
+		$id             = (int) ( $row['id'] ?? 0 );
+		$invoice_number = (string) get_pmpro_membership_order_meta( $id, self::META_INVOICE_NUMBER, true );
+		$currency       = strtoupper( (string) get_pmpro_membership_order_meta( $id, self::META_CURRENCY, true ) );
+		$currency       = $currency !== '' ? $currency : $this->default_currency();
 
 		$total    = $this->decimal_to_cents( (string) ( $row['total'] ?? '0' ), $currency );
 		$subtotal = $this->decimal_to_cents( (string) ( $row['subtotal'] ?? '0' ), $currency );
 		$tax      = $this->decimal_to_cents( (string) ( $row['tax'] ?? '0' ), $currency );
 
 		return new OrderModel(
-			id: (int) ( $row['id'] ?? 0 ),
+			id: $id,
 			userId: (int) ( $row['user_id'] ?? 0 ),
 			membershipLevelId: (int) ( $row['membership_id'] ?? 0 ),
 			code: (string) ( $row['code'] ?? '' ),
@@ -202,7 +204,7 @@ class OrderRepository implements OrderRepositoryInterface {
 			subtotal: $subtotal,
 			tax: $tax,
 			currency: $currency,
-			invoiceNumber: $invoice_number,
+			invoiceNumber: $invoice_number !== '' ? $invoice_number : null,
 			paymentMethod: ( $row['payment_type'] ?? '' ) ?: null,
 			subscriptionTransactionId: ( $row['subscription_transaction_id'] ?? '' ) ?: null,
 			testmode: ( (string) ( $row['gateway_environment'] ?? 'live' ) ) === 'sandbox',
@@ -268,35 +270,18 @@ class OrderRepository implements OrderRepositoryInterface {
 	}
 
 	/**
-	 * PMPro doesn't model invoice number or currency per order, so we tuck them
-	 * into the `notes` JSON blob alongside any merchant-supplied notes.
+	 * PMPro doesn't model invoice number or currency per order, so they live in
+	 * order meta. The `notes` column belongs to the merchant (PMPro shows it as
+	 * "Order Notes"), so we leave it alone.
 	 */
-	private function build_notes( ?string $invoice_number, string $currency ): string {
-		return wp_json_encode(
-			[
-				'vatly_invoice_number' => $invoice_number,
-				'vatly_currency'       => strtoupper( $currency ),
-			]
-		);
-	}
-
-	/**
-	 * @return array{0: ?string, 1: string} [invoice_number, currency]
-	 */
-	private function parse_notes( string $notes ): array {
-		if ( $notes === '' ) {
-			return [ null, $this->default_currency() ];
+	private function store_meta( int $order_id, ?string $invoice_number, ?string $currency ): void {
+		if ( $invoice_number !== null ) {
+			update_pmpro_membership_order_meta( $order_id, self::META_INVOICE_NUMBER, $invoice_number );
 		}
 
-		$decoded = json_decode( $notes, true );
-		if ( ! is_array( $decoded ) ) {
-			return [ null, $this->default_currency() ];
+		if ( $currency !== null ) {
+			update_pmpro_membership_order_meta( $order_id, self::META_CURRENCY, strtoupper( $currency ) );
 		}
-
-		return [
-			isset( $decoded['vatly_invoice_number'] ) ? (string) $decoded['vatly_invoice_number'] : null,
-			isset( $decoded['vatly_currency'] ) ? (string) $decoded['vatly_currency'] : $this->default_currency(),
-		];
 	}
 
 	private function default_currency(): string {

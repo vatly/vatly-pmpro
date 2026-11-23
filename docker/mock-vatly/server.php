@@ -25,7 +25,14 @@ final class MockVatly {
 
 	private const STATE_FILE     = '/tmp/mock-vatly-state.json';
 	private const WEBHOOK_SECRET = 'mock-secret-for-dev-only-do-not-use-in-prod';
-	private const HOSTED_BASE    = 'http://localhost:8091/__hosted';
+
+	/**
+	 * Where a browser reaches this mock: `MOCK_VATLY_PUBLIC_URL`, else the
+	 * docker-compose host port.
+	 */
+	private static function hosted_base(): string {
+		return rtrim(getenv('MOCK_VATLY_PUBLIC_URL') ?: 'http://localhost:8081', '/') . '/__hosted';
+	}
 
 	public function handle(string $method, string $path): void {
 		header('Content-Type: application/json');
@@ -142,7 +149,7 @@ final class MockVatly {
 			'redirectUrlCanceled'=> (string) ($body['redirectUrlCanceled'] ?? ''),
 			'planId'             => $plan_id,
 			'metadata'           => $body['metadata'] ?? null,
-			'href'               => self::HOSTED_BASE . '/' . $id,
+			'href'               => self::hosted_base() . '/' . $id,
 			'createdAt'          => date('c'),
 			'testmode'           => true,
 		];
@@ -266,9 +273,9 @@ final class MockVatly {
 				// Merchant-of-Record invoice: the driver reads
 				// links.customerInvoice to surface Vatly's compliant invoice.
 				'links'         => [
-					'self'            => ['href' => self::HOSTED_BASE . '/../v1/orders/' . $checkout['orderId'], 'type' => 'application/json'],
-					'customer'        => ['href' => self::HOSTED_BASE . '/../v1/customers/' . $checkout['customerId'], 'type' => 'application/json'],
-					'customerInvoice' => ['href' => self::HOSTED_BASE . '/invoice/' . $checkout['orderId'], 'type' => 'text/html'],
+					'self'            => ['href' => self::hosted_base() . '/../v1/orders/' . $checkout['orderId'], 'type' => 'application/json'],
+					'customer'        => ['href' => self::hosted_base() . '/../v1/customers/' . $checkout['customerId'], 'type' => 'application/json'],
+					'customerInvoice' => ['href' => self::hosted_base() . '/invoice/' . $checkout['orderId'], 'type' => 'text/html'],
 				],
 				// Propagate the checkout metadata (carries `pmpro_order_code`)
 				// onto the order so the driver can route the paid webhook to the

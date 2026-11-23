@@ -157,4 +157,41 @@ class CheckoutProcessorTest extends TestCase {
 
 		self::assertTrue(CheckoutProcessor::cancel_subscription($container, $pmpro_sub));
 	}
+
+	public function test_cancel_subscription_reads_getters_served_by_magic_call(): void {
+		// PMPro_Subscription (PMPro 3) has no real get_subscription_transaction_id():
+		// it is served by __call over its protected properties.
+		$container = new Container();
+
+		$action = \Mockery::mock(CancelSubscription::class);
+		$action->shouldReceive('execute')->once()->with('subscription_magic');
+		$container->set(CancelSubscription::class, static fn() => $action);
+
+		$pmpro_sub = new class {
+			protected string $subscription_transaction_id = 'subscription_magic';
+
+			/** @param array<int, mixed> $arguments */
+			public function __call(string $name, array $arguments): string {
+				return $this->{substr($name, 4)};
+			}
+		};
+
+		self::assertTrue(CheckoutProcessor::cancel_subscription($container, $pmpro_sub));
+	}
+
+	public function test_cancel_subscription_reports_a_failed_cancel(): void {
+		$container = new Container();
+
+		$action = \Mockery::mock(CancelSubscription::class);
+		$action->shouldReceive('execute')->andThrow(new \RuntimeException('Vatly unavailable'));
+		$container->set(CancelSubscription::class, static fn() => $action);
+
+		$pmpro_sub = new class {
+			public function get_subscription_transaction_id(): string {
+				return 'subscription_fail';
+			}
+		};
+
+		self::assertFalse(@CheckoutProcessor::cancel_subscription($container, $pmpro_sub));
+	}
 }

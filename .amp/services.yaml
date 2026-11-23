@@ -1,0 +1,21 @@
+services:
+  mock-vatly:
+    # Stands in for the Vatly API, hosted checkout and webhooks. Several
+    # workers: paying fires webhooks that call back into this server.
+    command: >-
+      PHP_CLI_SERVER_WORKERS=4
+      MOCK_VATLY_PUBLIC_URL="$PUBLIC_URL"
+      VATLY_WEBHOOK_URL=http://localhost:8090/wp-json/vatly/v1/webhook
+      php -S 0.0.0.0:"$PORT" router.php
+    cwd: docker/mock-vatly
+    port: 8091
+    portal:
+      title: Mock Vatly
+  wordpress:
+    command: PHP_CLI_SERVER_WORKERS=4 php -S 0.0.0.0:"$PORT" -t "$HOME/vatly-pmpro-site" docker/php-server-router.php
+    port: 8090
+    health: /wp-login.php
+    portal:
+      url: /membership-levels/
+      title: WordPress + PMPro
+      description: wp-admin login admin / admin. Payments go to the mock Vatly server.

@@ -29,7 +29,19 @@ class OrderRepositoryTest extends TestCase {
 			}
 		);
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
+		$meta = [];
+		Functions\when( 'update_pmpro_membership_order_meta' )->alias(
+			static function ( int $id, string $key, $value ) use ( &$meta ): bool {
+				$meta[ $id ][ $key ] = $value;
+
+				return true;
+			}
+		);
+		Functions\when( 'get_pmpro_membership_order_meta' )->alias(
+			static function ( int $id, string $key ) use ( &$meta ) {
+				return $meta[ $id ][ $key ] ?? '';
+			}
+		);
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -42,7 +54,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '19.00',
 			'tax'                         => '4.00',
 			'total'                       => '23.00',
-			'notes'                       => json_encode( [ 'vatly_invoice_number' => 'INV-1', 'vatly_currency' => 'EUR' ] ),
+			'notes'                       => '',
 			'payment_type'                => 'creditcard',
 			'subscription_transaction_id' => '',
 		];
@@ -77,12 +89,17 @@ class OrderRepositoryTest extends TestCase {
 		// testmode:true on the event → PMPro's `sandbox` environment, frozen
 		// per-record (not read from the global pmpro_gateway_environment).
 		self::assertSame( 'sandbox', $data['gateway_environment'] );
+
+		// Invoice number and currency go to order meta; the merchant's
+		// Order Notes column stays untouched.
+		self::assertSame( '', $data['notes'] );
+		self::assertSame( [ 'vatly_invoice_number' => 'INV-1', 'vatly_currency' => 'EUR' ], $meta[1] );
+		self::assertSame( 'INV-1', $order->invoiceNumber );
 	}
 
 	public function test_store_persists_live_environment_for_live_orders(): void {
 		Functions\when( 'get_option' )->justReturn( 'EUR' );
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -93,7 +110,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '19.00',
 			'tax'                         => '0.00',
 			'total'                       => '23.00',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'notes'                       => '',
 			'payment_type'                => '',
 			'subscription_transaction_id' => '',
 			'gateway_environment'         => 'live',
@@ -117,7 +134,6 @@ class OrderRepositoryTest extends TestCase {
 	public function test_store_sums_tax_summary_collection_items_into_tax_decimal(): void {
 		Functions\when( 'get_option' )->justReturn( 'EUR' );
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -130,7 +146,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '100.00',
 			'tax'                         => '21.50',
 			'total'                       => '121.50',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'notes'                       => '',
 			'payment_type'                => '',
 			'subscription_transaction_id' => '',
 		];
@@ -173,7 +189,6 @@ class OrderRepositoryTest extends TestCase {
 	public function test_store_with_no_hostCustomerId_inserts_anonymous_row(): void {
 		Functions\when( 'get_option' )->justReturn( 'EUR' );
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -186,7 +201,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '10.00',
 			'tax'                         => '0.00',
 			'total'                       => '10.00',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'notes'                       => '',
 			'payment_type'                => '',
 			'subscription_transaction_id' => '',
 		];
@@ -205,6 +220,7 @@ class OrderRepositoryTest extends TestCase {
 	}
 
 	public function test_update_status_paid_is_translated_to_success(): void {
+		Functions\when( 'get_option' )->justReturn( 'EUR' );
 		$order = new OrderModel(
 			id: 5,
 			userId: 7,
@@ -221,7 +237,6 @@ class OrderRepositoryTest extends TestCase {
 			subscriptionTransactionId: null,
 		);
 
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -234,7 +249,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '10.00',
 			'tax'                         => '0.00',
 			'total'                       => '10.00',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'EUR' ] ),
+			'notes'                       => '',
 			'payment_type'                => '',
 			'subscription_transaction_id' => '',
 		];
@@ -254,7 +269,6 @@ class OrderRepositoryTest extends TestCase {
 	public function test_cents_to_decimal_handles_zero_decimal_currencies(): void {
 		Functions\when( 'get_option' )->justReturn( 'JPY' );
 		Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
-		Functions\when( 'wp_json_encode' )->alias( 'json_encode' );
 
 		global $wpdb;
 		$wpdb->next_row = [
@@ -267,7 +281,7 @@ class OrderRepositoryTest extends TestCase {
 			'subtotal'                    => '5000',
 			'tax'                         => '0',
 			'total'                       => '5000',
-			'notes'                       => json_encode( [ 'vatly_currency' => 'JPY' ] ),
+			'notes'                       => '',
 			'payment_type'                => '',
 			'subscription_transaction_id' => '',
 		];
