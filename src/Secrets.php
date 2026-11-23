@@ -9,11 +9,9 @@ namespace Vatly\PMPro;
  *
  * Values are sealed with libsodium's secretbox (WordPress ships a polyfill),
  * keyed from `VATLY_PMPRO_ENCRYPTION_KEY` when defined, else WordPress's
- * `wp_salt( 'logged_in' )`. A stored value without the prefix is a plain
- * value saved by an earlier build: {@see reveal()} returns it as is and
- * {@see encrypt_stored()} encrypts it in place.
+ * `wp_salt( 'logged_in' )`.
  *
- * If the salts change, stored values can no longer be decrypted and read as
+ * If that key changes, stored values can no longer be decrypted and read as
  * empty: re-enter them on the gateway settings screen.
  */
 final class Secrets {
@@ -33,7 +31,8 @@ final class Secrets {
 	}
 
 	/**
-	 * The plain value of a stored secret, or '' when it cannot be decrypted.
+	 * The plain value of a stored secret, or '' when it is missing or cannot
+	 * be decrypted.
 	 *
 	 * @param mixed $stored
 	 */
@@ -41,7 +40,7 @@ final class Secrets {
 		$stored = (string) $stored;
 
 		if ( ! self::is_encrypted( $stored ) ) {
-			return $stored;
+			return '';
 		}
 
 		$raw = base64_decode( substr( $stored, strlen( self::PREFIX ) ), true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- See encrypt().
@@ -69,19 +68,6 @@ final class Secrets {
 		$plain = trim( $plain );
 
 		update_option( $option, $plain === '' ? '' : self::encrypt( $plain ), false );
-	}
-
-	/**
-	 * Encrypt values that earlier builds stored in plain text.
-	 */
-	public static function encrypt_stored(): void {
-		foreach ( self::OPTIONS as $option ) {
-			$stored = (string) get_option( $option, '' );
-
-			if ( $stored !== '' && ! self::is_encrypted( $stored ) ) {
-				self::store( $option, $stored );
-			}
-		}
 	}
 
 	private static function key(): string {

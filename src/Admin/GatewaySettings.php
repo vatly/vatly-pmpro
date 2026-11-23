@@ -16,6 +16,8 @@ use Vatly\PMPro\Webhooks\RestRoute;
  */
 final class GatewaySettings {
 
+	private const REMOVE_SUFFIX = '_remove';
+
 	public static function init(): void {
 		add_filter( 'pmpro_payment_option_fields', [ self::class, 'legacy_fields' ], 10, 2 );
 	}
@@ -68,26 +70,29 @@ final class GatewaySettings {
 
 	/**
 	 * A password field that never prints the stored value. Left blank, the
-	 * saved value is kept.
+	 * saved value is kept; the "Remove saved value" checkbox deletes it.
 	 */
 	private static function secret_input( string $option ): void {
 		$saved = (string) get_option( $option, '' ) !== '';
 		?>
 		<input type="password" id="<?php echo esc_attr( $option ); ?>" name="<?php echo esc_attr( $option ); ?>" value="" class="regular-text" autocomplete="new-password" placeholder="<?php echo $saved ? esc_attr__( 'Saved. Leave blank to keep it.', 'vatly-pmpro' ) : ''; ?>" />
+		<?php if ( $saved ) : ?>
+			<label><input type="checkbox" name="<?php echo esc_attr( $option . self::REMOVE_SUFFIX ); ?>" value="1" /> <?php esc_html_e( 'Remove saved value', 'vatly-pmpro' ); ?></label>
+		<?php endif; ?>
 		<?php
 	}
 
 	public static function save(): void {
-		// The API keys and webhook secret are stored encrypted, and a blank
-		// field keeps the saved value, since the form never prints it.
+		// The API keys and webhook secret are stored encrypted. The form never
+		// prints them, so a blank field keeps the saved value; a new value
+		// replaces it, and the remove checkbox deletes it.
 		foreach ( Secrets::OPTIONS as $key ) {
-			if ( ! isset( $_POST[ $key ] ) ) {
-				continue;
-			}
+			$value = isset( $_POST[ $key ] ) ? trim( sanitize_text_field( (string) wp_unslash( $_POST[ $key ] ) ) ) : '';
 
-			$value = trim( sanitize_text_field( (string) wp_unslash( $_POST[ $key ] ) ) );
 			if ( $value !== '' ) {
 				Secrets::store( $key, $value );
+			} elseif ( ! empty( $_POST[ $key . self::REMOVE_SUFFIX ] ) ) {
+				delete_option( $key );
 			}
 		}
 

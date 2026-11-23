@@ -57,9 +57,9 @@ wp_run plugin activate vatly-gateway-for-paid-memberships-pro
 echo "==> Wiring Vatly gateway settings"
 wp_run option update pmpro_gateway vatly
 wp_run option update pmpro_gateway_environment sandbox
-wp_run option update vatly_pmpro_api_key_test test_localdevkeyXXXXXXXXX
+wp_run eval '\Vatly\PMPro\Secrets::store( "vatly_pmpro_api_key_test", "test_localdevkeyXXXXXXXXX" );'
 wp_run option update vatly_pmpro_api_url "$MOCK_VATLY"
-wp_run option update vatly_pmpro_webhook_secret "mock-secret-for-dev-only-do-not-use-in-prod"
+wp_run eval '\Vatly\PMPro\Secrets::store( "vatly_pmpro_webhook_secret", "mock-secret-for-dev-only-do-not-use-in-prod" );'
 wp_run option update pmpro_currency EUR
 
 # Seed a recurring membership level mapped to a known mock plan id.

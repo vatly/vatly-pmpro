@@ -22,7 +22,6 @@ class GatewaySettingsTest extends TestCase {
 		parent::setUp();
 
 		$this->options = [];
-		Functions\when('wp_salt')->justReturn('site-salt-one');
 		Functions\when('esc_attr__')->returnArg(1);
 		Functions\when('get_option')->alias(fn(string $key, $default = '') => $this->options[$key] ?? $default);
 		Functions\when('update_option')->alias(function (string $key, $value) {
@@ -57,18 +56,52 @@ class GatewaySettingsTest extends TestCase {
 		self::assertSame('https://api.example.test', $this->options[Configuration::OPTION_API_URL]);
 	}
 
+	public function test_the_remove_checkbox_deletes_only_the_ticked_saved_value(): void {
+		Functions\when('delete_option')->alias(function (string $key) {
+			unset($this->options[$key]);
+
+			return true;
+		});
+		Secrets::store(Configuration::OPTION_API_KEY, 'live_realkeyXXXXXXXXX');
+		Secrets::store(Configuration::OPTION_WEBHOOK_SECRET, 'whsec_keep');
+
+		$_POST = [
+			Configuration::OPTION_API_KEY               => '',
+			Configuration::OPTION_API_KEY . '_remove'   => '1',
+			Configuration::OPTION_WEBHOOK_SECRET        => '',
+		];
+
+		GatewaySettings::save();
+
+		self::assertArrayNotHasKey(Configuration::OPTION_API_KEY, $this->options);
+		self::assertSame('whsec_keep', Secrets::reveal($this->options[Configuration::OPTION_WEBHOOK_SECRET]));
+	}
+
+	public function test_a_new_value_wins_over_the_remove_checkbox(): void {
+		Functions\expect('delete_option')->never();
+
+		$_POST = [
+			Configuration::OPTION_WEBHOOK_SECRET               => 'whsec_new',
+			Configuration::OPTION_WEBHOOK_SECRET . '_remove'   => '1',
+		];
+
+		GatewaySettings::save();
+
+		self::assertSame('whsec_new', Secrets::reveal($this->options[Configuration::OPTION_WEBHOOK_SECRET]));
+	}
+
 	public function test_render_never_prints_a_stored_secret(): void {
 		Secrets::store(Configuration::OPTION_WEBHOOK_SECRET, 'whsec_do_not_print');
-		$this->options[Configuration::OPTION_API_KEY] = 'live_legacy_plain_key';
 
 		ob_start();
 		GatewaySettings::render();
 		$html = (string) ob_get_clean();
 
 		self::assertStringNotContainsString('whsec_do_not_print', $html);
-		self::assertStringNotContainsString('live_legacy_plain_key', $html);
 		self::assertStringNotContainsString($this->options[Configuration::OPTION_WEBHOOK_SECRET], $html);
 		self::assertSame(3, substr_count($html, 'type="password"'));
 		self::assertStringContainsString('Saved. Leave blank to keep it.', $html);
+		self::assertSame(1, substr_count($html, 'name="' . Configuration::OPTION_WEBHOOK_SECRET . '_remove"'), 'Only a saved value gets a remove checkbox.');
+		self::assertSame(1, substr_count($html, 'type="checkbox"'));
 	}
 }
