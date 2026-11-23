@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Vatly\PMPro;
 
+use Vatly\Fluent\Actions\GetOrder;
 use Vatly\PMPro\Admin\GatewaySettings;
 use Vatly\PMPro\Admin\LevelOptions;
+use Vatly\PMPro\Gateway\InvoiceSurface;
 use Vatly\PMPro\Webhooks\RestRoute;
 
 /**
@@ -76,6 +78,14 @@ final class Plugin {
 		// Admin screens: gateway settings + level-level plan mapping.
 		GatewaySettings::init();
 		LevelOptions::init();
+
+		// Surface Vatly's Merchant-of-Record invoice (and credit note) link on
+		// the member- and admin-facing order views. Registered unconditionally
+		// (not gated on the active gateway) so historical Vatly orders keep their
+		// link even after the merchant switches gateways. Resolves fresh signed
+		// links at display time via GetOrder, resolved lazily: building it
+		// needs a valid API key, which a freshly installed site may not have.
+		( new InvoiceSurface( fn(): GetOrder => $this->container->get( GetOrder::class ) ) )->register();
 
 		$this->booted = true;
 	}

@@ -4,13 +4,13 @@
  *
  * Implements just enough surface to exercise the PMPro plugin end-to-end:
  *
- *   POST /v2/customers                 → create customer
- *   GET  /v2/customers/{id}            → fetch customer
- *   POST /v2/checkouts                 → create checkout (returns href)
- *   GET  /v2/checkouts/{id}            → fetch checkout (status flips on first GET)
- *   GET  /v2/subscriptions/{id}        → fetch subscription
- *   DELETE /v2/subscriptions/{id}      → cancel subscription
- *   GET  /v2/orders/{id}               → fetch order
+ *   POST /v1/customers                 → create customer
+ *   GET  /v1/customers/{id}            → fetch customer
+ *   POST /v1/checkouts                 → create checkout (returns href)
+ *   GET  /v1/checkouts/{id}            → fetch checkout (status flips on first GET)
+ *   GET  /v1/subscriptions/{id}        → fetch subscription
+ *   DELETE /v1/subscriptions/{id}      → cancel subscription
+ *   GET  /v1/orders/{id}               → fetch order
  *
  *   POST /__webhook/{event}            → dev helper: signs & POSTs a webhook to
  *                                        a configurable URL
@@ -25,7 +25,7 @@ final class MockVatly {
 
 	private const STATE_FILE     = '/tmp/mock-vatly-state.json';
 	private const WEBHOOK_SECRET = 'mock-secret-for-dev-only-do-not-use-in-prod';
-	private const HOSTED_BASE    = 'http://localhost:8081/__hosted';
+	private const HOSTED_BASE    = 'http://localhost:8091/__hosted';
 
 	public function handle(string $method, string $path): void {
 		header('Content-Type: application/json');
@@ -39,37 +39,41 @@ final class MockVatly {
 			return;
 		}
 
-		echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+		// HTML routes (hosted checkout / invoice) and redirects emit their own
+		// output and return null — don't append a JSON "null" after them.
+		if ($response !== null) {
+			echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+		}
 	}
 
 	private function route(string $method, string $path) {
 		$method = strtoupper($method);
 
-		if ($method === 'POST' && $path === '/v2/customers') {
+		if ($method === 'POST' && $path === '/v1/customers') {
 			return $this->create_customer();
 		}
 
-		if ($method === 'POST' && $path === '/v2/checkouts') {
+		if ($method === 'POST' && $path === '/v1/checkouts') {
 			return $this->create_checkout();
 		}
 
-		if ($method === 'GET' && preg_match('#^/v2/customers/(.+)$#', $path, $m)) {
+		if ($method === 'GET' && preg_match('#^/v1/customers/(.+)$#', $path, $m)) {
 			return $this->get_customer($m[1]);
 		}
 
-		if ($method === 'GET' && preg_match('#^/v2/checkouts/(.+)$#', $path, $m)) {
+		if ($method === 'GET' && preg_match('#^/v1/checkouts/(.+)$#', $path, $m)) {
 			return $this->get_checkout($m[1]);
 		}
 
-		if ($method === 'GET' && preg_match('#^/v2/subscriptions/(.+)$#', $path, $m)) {
+		if ($method === 'GET' && preg_match('#^/v1/subscriptions/(.+)$#', $path, $m)) {
 			return $this->get_subscription($m[1]);
 		}
 
-		if ($method === 'DELETE' && preg_match('#^/v2/subscriptions/(.+)$#', $path, $m)) {
+		if ($method === 'DELETE' && preg_match('#^/v1/subscriptions/(.+)$#', $path, $m)) {
 			return $this->cancel_subscription($m[1]);
 		}
 
-		if ($method === 'GET' && preg_match('#^/v2/orders/(.+)$#', $path, $m)) {
+		if ($method === 'GET' && preg_match('#^/v1/orders/(.+)$#', $path, $m)) {
 			return $this->get_order($m[1]);
 		}
 
@@ -95,7 +99,7 @@ final class MockVatly {
 
 	private function create_customer(): array {
 		$body = $this->json_body();
-		$id   = 'cus_' . bin2hex(random_bytes(6));
+		$id   = 'customer_' . bin2hex(random_bytes(6));
 
 		$customer = [
 			'resource' => 'customer',
@@ -122,7 +126,7 @@ final class MockVatly {
 
 	private function create_checkout(): array {
 		$body = $this->json_body();
-		$id   = 'chk_' . bin2hex(random_bytes(6));
+		$id   = 'checkout_' . bin2hex(random_bytes(6));
 
 		$products = $body['products'] ?? [];
 		$plan_id  = is_array($products) && isset($products[0]['id'])
@@ -196,17 +200,16 @@ final class MockVatly {
 			'status'        => 'paid',
 			'invoiceNumber' => 'INV-' . substr($id, 0, 6),
 			'paymentMethod' => 'creditcard',
-			'customerId'    => 'cus_unknown',
-			'total'         => ['amount' => '23.00', 'currency' => 'EUR'],
-			'subtotal'      => ['amount' => '19.00', 'currency' => 'EUR'],
+			'customerId'    => 'customer_unknown',
+			'total'         => ['value' => '23.00', 'currency' => 'EUR'],
+			'subtotal'      => ['value' => '19.00', 'currency' => 'EUR'],
 			'taxSummary'    => [
-				'items' => [
-					[
-						'rate'     => ['name' => 'NL standard', 'percentage' => 21.0, 'taxablePercentage' => 100.0],
-						'amount'   => ['amount' => '4.00', 'currency' => 'EUR'],
-					],
+				[
+					'taxRate' => ['name' => 'NL standard', 'percentage' => 21.0, 'taxablePercentage' => 100.0],
+					'amount'  => ['value' => '4.00', 'currency' => 'EUR'],
 				],
 			],
+			'lines'         => [],
 			'testmode'      => true,
 		];
 	}
@@ -215,6 +218,13 @@ final class MockVatly {
 
 	private function hosted_page(string $checkout_id): void {
 		header('Content-Type: text/html; charset=utf-8');
+
+		// Merchant-of-Record invoice page (linked from order.links.customerInvoice).
+		if (str_starts_with($checkout_id, 'invoice/')) {
+			$this->hosted_invoice(substr($checkout_id, strlen('invoice/')));
+
+			return;
+		}
 
 		$checkout = $this->load('checkouts', $checkout_id);
 		if (!$checkout) {
@@ -227,60 +237,73 @@ final class MockVatly {
 		// On click of "Pay", flip status to paid, fire a webhook, and redirect.
 		if (($_GET['action'] ?? '') === 'pay') {
 			$checkout['status']  = 'paid';
-			$checkout['orderId'] = 'ord_' . bin2hex(random_bytes(6));
+			$checkout['orderId'] = 'order_' . bin2hex(random_bytes(6));
 			$this->store('checkouts', $checkout_id, $checkout);
 
-			// Store the order so subsequent /v2/orders/{id} requests work.
-			$this->store('orders', $checkout['orderId'], [
+			// Build a full order resource (shape = api-php `Order`, byte-identical
+			// to `GET /v1/orders/{id}`). The webhook factory hydrates the typed
+			// event straight from this `object`, so it must carry every field the
+			// event reads — total/subtotal as Money (`value`), the flat
+			// taxSummary list, testmode, lines and the routing metadata.
+			$sub_id = 'subscription_' . bin2hex(random_bytes(6));
+			$order  = [
 				'resource'      => 'order',
 				'id'            => $checkout['orderId'],
+				'createdAt'     => date('c'),
 				'status'        => 'paid',
 				'invoiceNumber' => 'INV-' . substr($checkout['orderId'], 0, 6),
 				'paymentMethod' => 'creditcard',
 				'customerId'    => $checkout['customerId'],
-				'total'         => ['amount' => '23.00', 'currency' => 'EUR'],
-				'subtotal'      => ['amount' => '19.00', 'currency' => 'EUR'],
+				'total'         => ['value' => '23.00', 'currency' => 'EUR'],
+				'subtotal'      => ['value' => '19.00', 'currency' => 'EUR'],
 				'taxSummary'    => [
-					'items' => [
-						[
-							'rate'   => ['name' => 'NL standard', 'percentage' => 21.0, 'taxablePercentage' => 100.0],
-							'amount' => ['amount' => '4.00', 'currency' => 'EUR'],
-						],
+					[
+						'taxRate' => ['name' => 'NL standard', 'percentage' => 21.0, 'taxablePercentage' => 100.0],
+						'amount'  => ['value' => '4.00', 'currency' => 'EUR'],
 					],
 				],
+				'lines'         => [],
+				// Merchant-of-Record invoice: the driver reads
+				// links.customerInvoice to surface Vatly's compliant invoice.
+				'links'         => [
+					'self'            => ['href' => self::HOSTED_BASE . '/../v1/orders/' . $checkout['orderId'], 'type' => 'application/json'],
+					'customer'        => ['href' => self::HOSTED_BASE . '/../v1/customers/' . $checkout['customerId'], 'type' => 'application/json'],
+					'customerInvoice' => ['href' => self::HOSTED_BASE . '/invoice/' . $checkout['orderId'], 'type' => 'text/html'],
+				],
+				// Propagate the checkout metadata (carries `pmpro_order_code`)
+				// onto the order so the driver can route the paid webhook to the
+				// exact PMPro token order and convert it in place.
+				'metadata'      => $checkout['metadata'] ?? null,
 				'testmode'      => true,
-			]);
+			];
+			$this->store('orders', $checkout['orderId'], $order);
 
-			// Create a subscription so subsequent /v2/subscriptions/{id} works.
-			$sub_id = 'sub_' . bin2hex(random_bytes(6));
-			$this->store('subscriptions', $sub_id, [
+			// Build a full subscription resource (shape = api-php `Subscription`,
+			// byte-identical to `GET /v1/subscriptions/{id}`). Must carry the
+			// fields the started event reads: customerId, subscriptionPlanId,
+			// name, quantity, testmode.
+			$subscription = [
 				'resource'           => 'subscription',
-				'id'                 => $sub_id,
-				'subscriptionPlanId' => $checkout['planId'],
-				'name'               => 'Mock Subscription',
-				'quantity'           => 1,
-				'status'             => 'active',
-				'cancelledAt'        => null,
-				'endedAt'            => null,
-				'testmode'           => true,
-			]);
-
-			$this->store('chk_to_sub', $checkout_id, ['subscription_id' => $sub_id]);
-
-			$webhook_url = getenv('VATLY_WEBHOOK_URL') ?: 'http://wordpress/wp-json/vatly/v1/webhook';
-
-			$this->emit_webhook($webhook_url, 'subscription.started', [
 				'id'                 => $sub_id,
 				'customerId'         => $checkout['customerId'],
 				'subscriptionPlanId' => $checkout['planId'],
 				'name'               => 'Mock Subscription',
 				'quantity'           => 1,
-			], 'subscription', $sub_id);
+				'status'             => 'active',
+				'startedAt'          => date('c'),
+				'canceledAt'         => null,
+				'endedAt'            => null,
+				'testmode'           => true,
+			];
+			$this->store('subscriptions', $sub_id, $subscription);
 
-			$this->emit_webhook($webhook_url, 'order.paid', [
-				'id'         => $checkout['orderId'],
-				'customerId' => $checkout['customerId'],
-			], 'order', $checkout['orderId']);
+			$this->store('chk_to_sub', $checkout_id, ['subscription_id' => $sub_id]);
+
+			$webhook_url = getenv('VATLY_WEBHOOK_URL') ?: 'http://wordpress/wp-json/vatly/v1/webhook';
+
+			$this->emit_webhook($webhook_url, 'subscription.started', $subscription, 'subscription', $sub_id);
+
+			$this->emit_webhook($webhook_url, 'order.paid', $order, 'order', $checkout['orderId']);
 
 			header('Location: ' . $checkout['redirectUrlSuccess']);
 
@@ -317,6 +340,64 @@ final class MockVatly {
 					</form>
 				</p>
 				<p class="kv" style="margin-top: 2rem;">This is the mock Vatly server. No real money will move.</p>
+			</body>
+		</html>
+		<?php
+	}
+
+	/**
+	 * Render a stand-in Merchant-of-Record invoice for a paid order. Stands in
+	 * for the compliant PDF/HTML invoice Vatly generates as MoR.
+	 */
+	private function hosted_invoice(string $order_id): void {
+		$order = $this->load('orders', $order_id);
+
+		if (!$order) {
+			http_response_code(404);
+			echo '<h1>Unknown order</h1>';
+
+			return;
+		}
+
+		$invoice  = (string) ($order['invoiceNumber'] ?? '');
+		$total    = (string) ($order['total']['value'] ?? '');
+		$subtotal = (string) ($order['subtotal']['value'] ?? '');
+		$currency = (string) ($order['total']['currency'] ?? 'EUR');
+		$tax      = $order['taxSummary'][0] ?? [];
+		$tax_name = (string) ($tax['taxRate']['name'] ?? 'VAT');
+		$tax_pct  = (string) ($tax['taxRate']['percentage'] ?? '');
+		$tax_amt  = (string) ($tax['amount']['value'] ?? '');
+
+		$e = static fn(string $v): string => htmlspecialchars($v, ENT_QUOTES);
+
+		?>
+		<!doctype html>
+		<html lang="en">
+			<head>
+				<meta charset="utf-8">
+				<title>Invoice <?= $e($invoice) ?> — Vatly</title>
+				<style>
+					body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 540px; margin: 3rem auto; padding: 2rem; border: 1px solid #ddd; border-radius: 12px; color: #111; }
+					h1 { font-size: 1.1rem; letter-spacing: .02em; text-transform: uppercase; color: #666; margin: 0 0 .25rem; }
+					.num { font-size: 1.5rem; font-weight: 700; margin: 0 0 1.5rem; }
+					table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+					td { padding: .5rem 0; border-bottom: 1px solid #eee; }
+					td.r { text-align: right; }
+					tr.total td { border-bottom: 0; font-weight: 700; font-size: 1.1rem; padding-top: 1rem; }
+					.mor { margin-top: 2rem; font-size: .8rem; color: #666; line-height: 1.5; }
+				</style>
+			</head>
+			<body>
+				<h1>Vatly · Invoice</h1>
+				<p class="num"><?= $e($invoice) ?></p>
+				<table>
+					<tr><td>Subtotal</td><td class="r"><?= $e($currency) ?> <?= $e($subtotal) ?></td></tr>
+					<tr><td><?= $e($tax_name) ?> (<?= $e($tax_pct) ?>%)</td><td class="r"><?= $e($currency) ?> <?= $e($tax_amt) ?></td></tr>
+					<tr class="total"><td>Total</td><td class="r"><?= $e($currency) ?> <?= $e($total) ?></td></tr>
+				</table>
+				<p class="mor">Sold by Vatly as Merchant of Record. Vatly has collected and
+				will remit the <?= $e($tax_name) ?> shown above. This is the mock Vatly server —
+				no real money moved.</p>
 			</body>
 		</html>
 		<?php
