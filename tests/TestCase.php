@@ -41,6 +41,7 @@ abstract class TestCase extends PhpUnitTestCase {
 	 * any of these via `Functions\when()` / `expect()`.
 	 */
 	protected function setupCommonStubs(): void {
+		Monkey\Functions\when('wp_salt')->justReturn('unit-test-salt');
 		Monkey\Functions\when('__')->returnArg(1);
 		Monkey\Functions\when('esc_html__')->returnArg(1);
 		Monkey\Functions\when('esc_html_e')->alias(static fn(string $s) => print $s);

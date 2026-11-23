@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vatly\PMPro\Admin;
 
 use Vatly\PMPro\Configuration;
+use Vatly\PMPro\Secrets;
 use Vatly\PMPro\Webhooks\RestRoute;
 
 /**
@@ -15,16 +16,15 @@ use Vatly\PMPro\Webhooks\RestRoute;
  */
 final class GatewaySettings {
 
+	private const REMOVE_SUFFIX = '_remove';
+
 	public static function init(): void {
 		add_filter( 'pmpro_payment_option_fields', [ self::class, 'legacy_fields' ], 10, 2 );
 	}
 
 	public static function render(): void {
-		$api_key      = (string) get_option( Configuration::OPTION_API_KEY, '' );
-		$api_key_test = (string) get_option( Configuration::OPTION_API_KEY_TEST, '' );
-		$api_url      = (string) get_option( Configuration::OPTION_API_URL, '' );
-		$secret       = (string) get_option( Configuration::OPTION_WEBHOOK_SECRET, '' );
-		$webhook_url  = RestRoute::url();
+		$api_url     = (string) get_option( Configuration::OPTION_API_URL, '' );
+		$webhook_url = RestRoute::url();
 
 		?>
 		<table class="form-table">
@@ -36,11 +36,11 @@ final class GatewaySettings {
 				</tr>
 				<tr>
 					<th><label for="vatly_pmpro_api_key"><?php esc_html_e( 'Live API key', 'vatly-pmpro' ); ?></label></th>
-					<td><input type="text" id="vatly_pmpro_api_key" name="<?php echo esc_attr( Configuration::OPTION_API_KEY ); ?>" value="<?php echo esc_attr( $api_key ); ?>" class="regular-text" autocomplete="off" /></td>
+					<td><?php self::secret_input( Configuration::OPTION_API_KEY ); ?></td>
 				</tr>
 				<tr>
 					<th><label for="vatly_pmpro_api_key_test"><?php esc_html_e( 'Test API key', 'vatly-pmpro' ); ?></label></th>
-					<td><input type="text" id="vatly_pmpro_api_key_test" name="<?php echo esc_attr( Configuration::OPTION_API_KEY_TEST ); ?>" value="<?php echo esc_attr( $api_key_test ); ?>" class="regular-text" autocomplete="off" /></td>
+					<td><?php self::secret_input( Configuration::OPTION_API_KEY_TEST ); ?></td>
 				</tr>
 				<tr>
 					<th><label for="vatly_pmpro_api_url"><?php esc_html_e( 'API endpoint', 'vatly-pmpro' ); ?></label></th>
@@ -52,7 +52,7 @@ final class GatewaySettings {
 				<tr>
 					<th><label for="vatly_pmpro_webhook_secret"><?php esc_html_e( 'Webhook signing secret', 'vatly-pmpro' ); ?></label></th>
 					<td>
-						<input type="text" id="vatly_pmpro_webhook_secret" name="<?php echo esc_attr( Configuration::OPTION_WEBHOOK_SECRET ); ?>" value="<?php echo esc_attr( $secret ); ?>" class="regular-text" autocomplete="off" />
+						<?php self::secret_input( Configuration::OPTION_WEBHOOK_SECRET ); ?>
 						<p class="description"><?php esc_html_e( 'The signing secret shown in your Vatly dashboard for this webhook.', 'vatly-pmpro' ); ?></p>
 					</td>
 				</tr>
@@ -68,12 +68,36 @@ final class GatewaySettings {
 		<?php
 	}
 
+	/**
+	 * A password field that never prints the stored value. Left blank, the
+	 * saved value is kept; the "Remove saved value" checkbox deletes it.
+	 */
+	private static function secret_input( string $option ): void {
+		$saved = (string) get_option( $option, '' ) !== '';
+		?>
+		<input type="password" id="<?php echo esc_attr( $option ); ?>" name="<?php echo esc_attr( $option ); ?>" value="" class="regular-text" autocomplete="new-password" placeholder="<?php echo $saved ? esc_attr__( 'Saved. Leave blank to keep it.', 'vatly-pmpro' ) : ''; ?>" />
+		<?php if ( $saved ) : ?>
+			<label><input type="checkbox" name="<?php echo esc_attr( $option . self::REMOVE_SUFFIX ); ?>" value="1" /> <?php esc_html_e( 'Remove saved value', 'vatly-pmpro' ); ?></label>
+		<?php endif; ?>
+		<?php
+	}
+
 	public static function save(): void {
+		// The API keys and webhook secret are stored encrypted. The form never
+		// prints them, so a blank field keeps the saved value; a new value
+		// replaces it, and the remove checkbox deletes it.
+		foreach ( Secrets::OPTIONS as $key ) {
+			$value = isset( $_POST[ $key ] ) ? trim( sanitize_text_field( (string) wp_unslash( $_POST[ $key ] ) ) ) : '';
+
+			if ( $value !== '' ) {
+				Secrets::store( $key, $value );
+			} elseif ( ! empty( $_POST[ $key . self::REMOVE_SUFFIX ] ) ) {
+				delete_option( $key );
+			}
+		}
+
 		$keys = [
-			Configuration::OPTION_API_KEY,
-			Configuration::OPTION_API_KEY_TEST,
 			Configuration::OPTION_API_URL,
-			Configuration::OPTION_WEBHOOK_SECRET,
 			Configuration::OPTION_TESTMODE,
 		];
 

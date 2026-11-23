@@ -30,7 +30,7 @@ class ContainerTest extends TestCase {
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = '' ) {
 				$opts = [
-					'vatly_pmpro_api_key_test'  => 'test_localdevkeyXXXXXXXXX',
+					'vatly_pmpro_api_key_test'  => \Vatly\PMPro\Secrets::encrypt('test_localdevkeyXXXXXXXXX'),
 					'pmpro_gateway_environment' => 'sandbox',
 				];
 
@@ -55,7 +55,7 @@ class ContainerTest extends TestCase {
 		Functions\when( 'get_option' )->alias(
 			static function ( string $key, $default = '' ) {
 				$opts = [
-					'vatly_pmpro_api_key_test'  => 'test_localdevkeyXXXXXXXXX',
+					'vatly_pmpro_api_key_test'  => \Vatly\PMPro\Secrets::encrypt('test_localdevkeyXXXXXXXXX'),
 					'pmpro_gateway_environment' => 'sandbox',
 				];
 

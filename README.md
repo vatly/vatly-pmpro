@@ -148,6 +148,8 @@ case where the user returns to your site before the webhook arrives.
 | Webhook signing secret | The HMAC secret shown in your Vatly dashboard. Required to receive webhooks. |
 | Webhook URL          | `/wp-json/vatly/v1/webhook` on your site — paste this into the Vatly dashboard. |
 
+The API keys and webhook secret are stored encrypted and never shown again on the settings screen; leave a field blank to keep its saved value, or tick "Remove saved value" to delete it. The encryption key comes from your WordPress salts (`LOGGED_IN_KEY` / `LOGGED_IN_SALT`), or from `VATLY_PMPRO_ENCRYPTION_KEY` when you define it in `wp-config.php`. If that key changes, enter the API keys and webhook secret again. Until a webhook secret is saved, the webhook endpoint answers `503` and processes nothing.
+
 Per-level setup:
 
 - Edit a PMPro level → scroll to **Vatly Plan** → paste the `plan_xxx` id.
@@ -223,7 +225,7 @@ These are in [Roadmap](#roadmap). Each is small.
 | PHP         | 8.1, 8.2, 8.3                          | —               |
 | WordPress   | 6.5 (minimum we claim), latest stable  | trunk           |
 | PMPro       | 3.0+                                   | —               |
-| Vatly SDK   | `vatly-fluent-php ^0.8.0-alpha.18`     | —               |
+| Vatly SDK   | `vatly-fluent-php` alpha (see `composer.json`) | —      |
 
 CI runs unit + integration suites across these on every PR.
 
