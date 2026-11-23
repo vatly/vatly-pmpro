@@ -51,8 +51,10 @@ final class InvoiceSurface {
 		add_filter( 'pmpro_confirmation_message', [ $this, 'append_to_confirmation' ], 10, 2 );
 		// Member: single invoice / order view.
 		add_action( 'pmpro_invoice_bullets_bottom', [ $this, 'render_invoice_bullet' ] );
-		// Admin: order edit screen.
-		add_action( 'pmpro_after_order_settings', [ $this, 'render_admin_link' ] );
+		// Admin: the order view screen (PMPro 3.6+ opens orders here) and the
+		// order edit form.
+		add_action( 'pmpro_after_order_view_main', [ $this, 'render_admin_view_section' ] );
+		add_action( 'pmpro_after_order_settings', [ $this, 'render_admin_edit_rows' ] );
 	}
 
 	/**
@@ -110,28 +112,64 @@ final class InvoiceSurface {
 	}
 
 	/**
+	 * A "Vatly documents" box on the admin order view screen.
+	 *
 	 * @param object|null $order PMPro MemberOrder
 	 */
-	public function render_admin_link( $order = null ): void {
-		$invoice_url = $this->invoice_url( $order );
-		if ( $invoice_url !== '' ) {
+	public function render_admin_view_section( $order = null ): void {
+		$links = $this->admin_links( $order );
+		if ( $links === [] ) {
+			return;
+		}
+
+		echo '<div id="vatly_pmpro_order-documents" class="pmpro_section" data-visibility="shown" data-activated="true">';
+		echo '<div class="pmpro_section_toggle"><button class="pmpro_section-toggle-button" type="button" aria-expanded="true"><span class="dashicons dashicons-arrow-up-alt2"></span>' . esc_html__( 'Vatly documents', 'vatly-pmpro' ) . '</button></div>';
+		echo '<div class="pmpro_section_inside"><ul class="pmpro_list pmpro_list-plain pmpro_list-with-labels pmpro_cols-2">';
+		foreach ( $links as $label => $url ) {
 			printf(
-				'<p><strong>%s</strong> <a href="%s" target="_blank" rel="noopener noreferrer">%s</a></p>',
-				esc_html__( 'Vatly invoice:', 'vatly-pmpro' ),
-				esc_url( $invoice_url ),
+				'<li class="pmpro_list_item"><span class="pmpro_list_item_label">%s</span><a href="%s" target="_blank" rel="noopener noreferrer">%s</a></li>',
+				esc_html( $label ),
+				esc_url( $url ),
 				esc_html__( 'View on Vatly', 'vatly-pmpro' )
 			);
+		}
+		echo '</ul></div></div>';
+	}
+
+	/**
+	 * Rows in the admin order edit form's settings table.
+	 *
+	 * @param object|null $order PMPro MemberOrder
+	 */
+	public function render_admin_edit_rows( $order = null ): void {
+		foreach ( $this->admin_links( $order ) as $label => $url ) {
+			printf(
+				'<tr><th scope="row">%s</th><td><a href="%s" target="_blank" rel="noopener noreferrer">%s</a></td></tr>',
+				esc_html( $label ),
+				esc_url( $url ),
+				esc_html__( 'View on Vatly', 'vatly-pmpro' )
+			);
+		}
+	}
+
+	/**
+	 * @param  object|null $order PMPro MemberOrder
+	 * @return array<string, string> Label => fresh signed URL.
+	 */
+	private function admin_links( $order ): array {
+		$links = [];
+
+		$invoice_url = $this->invoice_url( $order );
+		if ( $invoice_url !== '' ) {
+			$links[ __( 'Vatly invoice', 'vatly-pmpro' ) ] = $invoice_url;
 		}
 
 		$credit_note_url = $this->credit_note_url( $order );
 		if ( $credit_note_url !== '' ) {
-			printf(
-				'<p><strong>%s</strong> <a href="%s" target="_blank" rel="noopener noreferrer">%s</a></p>',
-				esc_html__( 'Vatly credit note:', 'vatly-pmpro' ),
-				esc_url( $credit_note_url ),
-				esc_html__( 'View on Vatly', 'vatly-pmpro' )
-			);
+			$links[ __( 'Vatly credit note', 'vatly-pmpro' ) ] = $credit_note_url;
 		}
+
+		return $links;
 	}
 
 	/**

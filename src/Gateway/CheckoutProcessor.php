@@ -220,9 +220,7 @@ final class CheckoutProcessor {
 	 * @param object $subscription PMPro_Subscription
 	 */
 	public static function cancel_subscription( Container $container, $subscription ): bool {
-		$transaction_id = method_exists( $subscription, 'get_subscription_transaction_id' )
-			? (string) $subscription->get_subscription_transaction_id()
-			: '';
+		$transaction_id = self::subscription_transaction_id( $subscription );
 
 		if ( $transaction_id === '' ) {
 			return true;
@@ -234,6 +232,9 @@ final class CheckoutProcessor {
 		try {
 			$action->execute( $transaction_id );
 		} catch ( \Throwable $e ) {
+			// PMPro only tells the admin to check the gateway; log why.
+			error_log( '[vatly-pmpro] cancelling subscription ' . $transaction_id . ' failed: ' . $e->getMessage() );
+
 			return false;
 		}
 
@@ -244,9 +245,7 @@ final class CheckoutProcessor {
 	 * @param object $subscription PMPro_Subscription
 	 */
 	public static function sync_subscription( Container $container, $subscription ) {
-		$transaction_id = method_exists( $subscription, 'get_subscription_transaction_id' )
-			? (string) $subscription->get_subscription_transaction_id()
-			: '';
+		$transaction_id = self::subscription_transaction_id( $subscription );
 
 		if ( $transaction_id === '' ) {
 			return null;
@@ -264,7 +263,21 @@ final class CheckoutProcessor {
 		return null;
 	}
 
-	private static function plan_id_for_level( int $level_id ): string {
+	/**
+	 * The Vatly subscription id on a PMPro_Subscription.
+	 *
+	 * PMPro 3 serves its getters through `__call`, so `method_exists()` is
+	 * false for them; `is_callable()` sees them.
+	 *
+	 * @param object $subscription PMPro_Subscription
+	 */
+	private static function subscription_transaction_id( $subscription ): string {
+		return is_callable( [ $subscription, 'get_subscription_transaction_id' ] )
+			? (string) $subscription->get_subscription_transaction_id()
+			: '';
+	}
+
+		private static function plan_id_for_level( int $level_id ): string {
 		if ( $level_id === 0 || ! function_exists( 'get_pmpro_membership_level_meta' ) ) {
 			return '';
 		}

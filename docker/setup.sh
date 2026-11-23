@@ -62,6 +62,13 @@ wp_run option update vatly_pmpro_api_url "$MOCK_VATLY"
 wp_run eval '\Vatly\PMPro\Secrets::store( "vatly_pmpro_webhook_secret", "mock-secret-for-dev-only-do-not-use-in-prod" );'
 wp_run option update pmpro_currency EUR
 
+# PMPro's setup wizard normally creates its pages; a WP-CLI install has to.
+if [ -z "$(wp_run option get pmpro_checkout_page_id 2>/dev/null)" ]; then
+	echo "==> Creating PMPro pages"
+	wp_run eval 'pmpro_generatePages( [ "account" => "Membership Account", "billing" => "Membership Billing", "cancel" => "Membership Cancel", "checkout" => "Membership Checkout", "confirmation" => "Membership Confirmation", "invoice" => "Membership Orders", "levels" => "Membership Levels", "login" => "Log In", "member_profile_edit" => "Your Profile" ] );'
+	wp_run rewrite flush --hard
+fi
+
 # Seed a recurring membership level mapped to a known mock plan id.
 if ! wp_run pmpro level get 1 >/dev/null 2>&1; then
 	echo "==> Creating sample membership level"
@@ -78,8 +85,8 @@ esac
 
 if [ -n "$LEVEL_ID" ]; then
 	echo "==> Mapping level $LEVEL_ID to Vatly plan plan_local_dev"
-	wp_run db query "DELETE FROM wp_pmpro_membership_levelmeta WHERE membership_id=${LEVEL_ID} AND meta_key='pmpro_vatly_plan_id'"
-	wp_run db query "INSERT INTO wp_pmpro_membership_levelmeta (membership_id, meta_key, meta_value) VALUES (${LEVEL_ID}, 'pmpro_vatly_plan_id', 'plan_local_dev')"
+	wp_run db query "DELETE FROM wp_pmpro_membership_levelmeta WHERE pmpro_membership_level_id=${LEVEL_ID} AND meta_key='pmpro_vatly_plan_id'"
+	wp_run db query "INSERT INTO wp_pmpro_membership_levelmeta (pmpro_membership_level_id, meta_key, meta_value) VALUES (${LEVEL_ID}, 'pmpro_vatly_plan_id', 'plan_local_dev')"
 fi
 
 echo
@@ -88,5 +95,5 @@ echo "    Site:        $SITE_URL"
 echo "    Admin login: $ADMIN_USER / $ADMIN_PASS"
 echo "    Mock Vatly:  $MOCK_VATLY  (browser: http://localhost:8081)"
 echo
-echo "    Try a checkout: $SITE_URL/membership-account/membership-checkout/?level=$LEVEL_ID"
+echo "    Try a checkout: $SITE_URL/membership-checkout/?pmpro_level=$LEVEL_ID"
 echo "    Webhook URL:    $SITE_URL/wp-json/vatly/v1/webhook"

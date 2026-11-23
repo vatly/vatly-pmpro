@@ -30,7 +30,7 @@ container — edits are picked up instantly, no rebuild needed.
 
 ## Running a checkout
 
-1. Browse to <http://localhost:8080/membership-account/membership-checkout/?level=1>.
+1. Browse to <http://localhost:8080/membership-checkout/?pmpro_level=1>.
 2. Sign up / log in.
 3. Click **Continue to Vatly checkout**. You land on the mock hosted checkout
    page (port 8081).
