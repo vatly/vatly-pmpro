@@ -26,9 +26,13 @@ define( 'VATLY_PMPRO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'VATLY_PMPRO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'VATLY_PMPRO_MIN_PMPRO_VERSION', '3.0' );
 
+// The release zip ships its own vendor/. A Composer-managed site (such as
+// Bedrock) autoloads the plugin and its dependencies from the site's vendor/.
 $vatly_pmpro_autoload = __DIR__ . '/vendor/autoload.php';
 
-if ( ! file_exists( $vatly_pmpro_autoload ) ) {
+if ( file_exists( $vatly_pmpro_autoload ) ) {
+	require_once $vatly_pmpro_autoload;
+} elseif ( ! class_exists( \Vatly\PMPro\Plugin::class ) ) {
 	add_action(
 		'admin_notices',
 		static function () {
@@ -37,7 +41,7 @@ if ( ! file_exists( $vatly_pmpro_autoload ) ) {
 			}
 			echo '<div class="notice notice-error"><p>';
 			echo esc_html__(
-				'Vatly Gateway for Paid Memberships Pro is installed but Composer dependencies are missing. Run `composer install` inside the plugin directory.',
+				'Vatly Gateway for Paid Memberships Pro is installed but Composer dependencies are missing. Run `composer install` inside the plugin directory, or install the plugin with Composer at the site level.',
 				'vatly-pmpro'
 			);
 			echo '</p></div>';
@@ -46,8 +50,6 @@ if ( ! file_exists( $vatly_pmpro_autoload ) ) {
 
 	return;
 }
-
-require_once $vatly_pmpro_autoload;
 
 // Boot at priority 20 — *after* PMPro's default load priority of 10. This
 // guarantees the global `PMProGateway` base class exists by the time we try to

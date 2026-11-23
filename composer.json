@@ -1,5 +1,5 @@
 {
-    "name": "vatly/vatly-gateway-for-paid-memberships-pro",
+    "name": "vatly/vatly-pmpro",
     "description": "Paid Memberships Pro payment gateway for Vatly, the European Merchant of Record for AI, software and digital products. Stop maintaining your own VAT logic.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
@@ -24,8 +24,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues",
-        "source": "https://github.com/vatly/vatly-gateway-for-paid-memberships-pro"
+        "issues": "https://github.com/vatly/vatly-pmpro/issues",
+        "source": "https://github.com/vatly/vatly-pmpro"
     },
     "require": {
         "php": ">=8.1",
@@ -72,8 +72,9 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.1.x-dev"
-        }
+            "dev-main": "0.3.x-dev"
+        },
+        "installer-name": "vatly-gateway-for-paid-memberships-pro"
     },
     "minimum-stability": "dev",
     "prefer-stable": true
