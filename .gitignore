@@ -21,3 +21,6 @@ composer.lock
 
 # Release build outputs (zip + scoped tree + downloaded php-scoper PHAR).
 /build/
+
+# Amp orb portals
+.amp/portals/*

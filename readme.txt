@@ -49,6 +49,7 @@ GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
 
 = 0.3.0 =
 * Vatly's invoice, and on refunded orders its credit note, are linked from the checkout confirmation, the member invoice page and the admin order screen. The signed links are fetched fresh when shown and never stored. A completed refund marks the PMPro order as refunded and keeps the membership.
+* Fixed: the Vatly invoice number and currency are stored in order meta. Earlier builds wrote them as JSON into the order's notes, which PMPro shows to admins as Order Notes.
 * Fixed: plan-to-level lookups read the wrong level meta column, so subscription webhooks could not find the mapped membership level.
 * Fixed: cancelling a membership in WordPress now cancels the subscription at Vatly. With Paid Memberships Pro 3, the subscription was marked cancelled in WordPress without contacting Vatly, so renewals kept being charged. If members cancelled on an earlier build, check their subscriptions in your Vatly dashboard and cancel any that are still active.
 * Webhooks are refused until a secret is configured. While no webhook secret is saved, the webhook endpoint answers 503 and processes nothing; Vatly retries the delivery once the secret is saved. If your site has no webhook secret saved, save the secret from your Vatly dashboard in the gateway settings to keep receiving webhooks. The webhook endpoint is only registered while Paid Memberships Pro is active.

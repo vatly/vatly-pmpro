@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The dev site's database does not survive an orb pause.
+set -euo pipefail
+sudo service mariadb start >/dev/null 2>&1 || sudo service mysql start >/dev/null
