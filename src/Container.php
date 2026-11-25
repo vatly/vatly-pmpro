@@ -216,6 +216,11 @@ class Container {
 						new MarkOrderRefundedOnRefund( $orders ),
 						new WriteOrderRowOnPaid( $bindings, $orders ),
 					],
+					// Refuse a webhook whose test/live mode differs from the
+					// key we call the API with. Read the mode from the key,
+					// not isTestmode(): sandbox without a test key falls back
+					// to the live key, so its webhooks are live.
+					testmode: str_starts_with( $config->getApiKey(), 'test_' ),
 				);
 			}
 		);

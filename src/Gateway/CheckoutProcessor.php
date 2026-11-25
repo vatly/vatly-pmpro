@@ -345,7 +345,14 @@ final class CheckoutProcessor {
 		return $user ?: null;
 	}
 
-	private static function checkout_href( ApiCheckout $checkout ): string {
+	/**
+	 * @internal Exposed for tests.
+	 */
+	public static function checkout_href( ApiCheckout $checkout ): string {
+		if ( isset( $checkout->links->checkoutUrl->href ) ) {
+			return (string) $checkout->links->checkoutUrl->href;
+		}
+
 		if ( isset( $checkout->href ) && is_string( $checkout->href ) ) {
 			return $checkout->href;
 		}

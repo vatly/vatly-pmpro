@@ -38,7 +38,7 @@ container — edits are picked up instantly, no rebuild needed.
    - Flips the checkout to `paid`.
    - Creates a subscription and an order.
    - Signs and POSTs `subscription.started` + `order.paid` webhooks to
-     `http://wordpress/wp-json/vatly/v1/webhook`.
+     `http://localhost/wp-json/vatly/v1/webhook`.
    - Redirects you back to PMPro's confirmation page.
 5. The webhook reactions assign the PMPro level and write the order row.
    Verify under **Memberships → Orders** and **Users → Profile → Membership**.
