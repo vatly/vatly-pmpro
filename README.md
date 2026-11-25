@@ -13,6 +13,8 @@
 A WordPress plugin that adds **Vatly** as a payment gateway to
 [Paid Memberships Pro](https://wordpress.org/plugins/paid-memberships-pro/),
 the largest free WordPress membership plugin (100k+ installs).
+Full documentation:
+[docs.vatly.com/packages/pmpro](https://docs.vatly.com/packages/pmpro/readme).
 
 ## Why
 
@@ -63,6 +65,23 @@ your memberships:
    field below the existing settings.
 6. In your Vatly dashboard, paste the webhook URL shown on the gateway
    settings screen and pick the matching signing secret.
+
+### Install with Composer
+
+Sites that manage plugins with Composer (Bedrock with `composer/installers`,
+for example) can require the plugin from
+[Packagist](https://packagist.org/packages/vatly/vatly-pmpro). Its
+dependencies are alpha releases, so allow alpha packages first:
+
+```bash
+composer config minimum-stability alpha
+composer config prefer-stable true
+composer require vatly/vatly-pmpro
+```
+
+It installs as `vatly-gateway-for-paid-memberships-pro`, the same directory
+name the zip uses, and loads its dependencies through the site's Composer
+autoloader. Then follow steps 3 to 6 above.
 
 ### Install from source (developer mode)
 
