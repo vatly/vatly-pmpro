@@ -4,7 +4,7 @@ Tags: paid memberships pro, vat, eu vat, payment gateway, merchant of record
 Requires at least: 6.5
 Tested up to: 6.5
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,11 @@ Cards, PayPal, iDEAL, Apple Pay, SEPA, and a growing list — Vatly enables them
 GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
 
 == Changelog ==
+
+= 0.3.1 =
+* Fixed: subscription checkouts failed with a validation error, because the checkout metadata sent the membership level and WordPress user IDs as numbers. Vatly accepts only text metadata values; both are now sent as text.
+* Requires vatly-fluent-php 0.8.0-alpha.34, which no longer sends `testmode` when creating a checkout.
+* The plugin can be installed with Composer as `vatly/vatly-pmpro`.
 
 = 0.3.0 =
 * Vatly's invoice, and on refunded orders its credit note, are linked from the checkout confirmation, the member invoice page and the admin order screen. The signed links are fetched fresh when shown and never stored. A completed refund marks the PMPro order as refunded and keeps the membership.

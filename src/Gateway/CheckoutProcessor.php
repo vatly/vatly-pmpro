@@ -132,8 +132,8 @@ final class CheckoutProcessor {
 				[
 					'metadata' => [
 						'pmpro_order_code' => $order->code,
-						'pmpro_level_id'   => (int) $order->membership_id,
-						'wp_user_id'       => (int) $user->ID,
+						'pmpro_level_id'   => (string) (int) $order->membership_id,
+						'wp_user_id'       => (string) (int) $user->ID,
 					],
 				]
 			);
