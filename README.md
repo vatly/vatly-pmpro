@@ -35,8 +35,8 @@ your memberships:
 
 ## Requirements
 
-- WordPress **6.2** or newer
-- PHP **8.0** or newer
+- WordPress **6.5** or newer
+- PHP **8.1** or newer
 - Paid Memberships Pro **3.0** or newer
 - A [Vatly](https://vatly.com) account (free to start)
 
@@ -45,7 +45,7 @@ your memberships:
 ### Install from a release zip (recommended for end users)
 
 1. Download the latest release zip from the
-   [Releases](https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/releases)
+   [Releases](https://github.com/vatly/vatly-pmpro/releases)
    page. The zip ships with:
    - `vendor/` already vendored, so **no Composer needed** on the target
      site;
@@ -67,8 +67,8 @@ your memberships:
 ### Install from source (developer mode)
 
 ```bash
-git clone https://github.com/vatly/vatly-gateway-for-paid-memberships-pro.git
-cd vatly-gateway-for-paid-memberships-pro
+git clone https://github.com/vatly/vatly-pmpro.git
+cd vatly-pmpro
 composer install --no-dev --optimize-autoloader
 ```
 

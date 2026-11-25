@@ -43,7 +43,7 @@ Cards, PayPal, iDEAL, Apple Pay, SEPA, and a growing list — Vatly enables them
 
 = Where can I report bugs or request features? =
 
-GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
+GitHub: https://github.com/vatly/vatly-pmpro/issues
 
 == Changelog ==
 
