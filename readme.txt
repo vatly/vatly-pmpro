@@ -4,7 +4,7 @@ Tags: paid memberships pro, vat, eu vat, payment gateway, merchant of record
 Requires at least: 6.5
 Tested up to: 6.5
 Requires PHP: 8.1
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,7 +31,7 @@ Vatly is the European Merchant of Record for AI, software and digital products, 
 
 = Does this replace the pmpro-vat-tax addon? =
 
-Yes. With Vatly as the merchant of record, Vatly handles the VAT split, every country, every rate, every recurring renewal. You no longer need to maintain `pmpro_tax` filter snippets.
+For checkouts paid with Vatly, yes. Vatly works out the member's country, checks VAT numbers and charges VAT, so on those checkouts the add-on's fields, checks, tax and price note are skipped. Checkouts with another gateway, such as Pay by Check, still use the add-on. If Vatly is your only gateway, you can deactivate it.
 
 = Which price do members pay? =
 
@@ -46,6 +46,12 @@ Cards, PayPal, iDEAL, Apple Pay, SEPA, and a growing list — Vatly enables them
 GitHub: https://github.com/vatly/vatly-gateway-for-paid-memberships-pro/issues
 
 == Changelog ==
+
+= 0.4.0 =
+* Works next to the PMPro VAT Tax add-on. On checkouts paid with Vatly, the add-on's country and VAT number fields, its checks, its tax and its price note are skipped; checkouts with other gateways still use it. An admin notice says so while the add-on is active.
+* Works next to a second gateway such as Pay by Check: the checkout shows Vatly's button only while Vatly is selected, and the other gateway's button and fields otherwise.
+* Fixed: checkout stopped with "Vatly did not return a hosted checkout URL." The plugin now reads the hosted checkout link from Vatly's response.
+* Webhooks for the other mode than the API key in use (test or live) are refused with a 400. Requires vatly-fluent-php 0.8.0-alpha.35.
 
 = 0.3.1 =
 * Fixed: subscription checkouts failed with a validation error, because the checkout metadata sent the membership level and WordPress user IDs as numbers. Vatly accepts only text metadata values; both are now sent as text.

@@ -88,6 +88,35 @@ class ContainerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * Sandbox mode without a test key calls the API with the live key, so a
+	 * test-mode webhook must be refused even though isTestmode() is true.
+	 */
+	public function test_webhook_processor_refuses_test_webhook_when_calling_with_live_key(): void {
+		$secret = 'a-real-secret-32-bytes-long-OKKK';
+		Functions\when( 'get_option' )->alias(
+			static function ( string $key, $default = '' ) use ( $secret ) {
+				$opts = [
+					'vatly_pmpro_api_key'        => \Vatly\PMPro\Secrets::encrypt( 'live_localdevkeyXXXXXXXXX' ),
+					'vatly_pmpro_webhook_secret' => \Vatly\PMPro\Secrets::encrypt( $secret ),
+					'pmpro_gateway_environment'  => 'sandbox',
+				];
+
+				return $opts[ $key ] ?? $default;
+			}
+		);
+
+		$processor = ( new Container() )->get( WebhookProcessor::class );
+
+		$payload   = '{"id":"evt_1","resource":"subscription","eventName":"subscription.started","entityType":"subscription","entityId":"sub_1","testmode":true,"createdAt":"2026-01-01T00:00:00Z","object":{"customerId":"cus_1"}}';
+		$timestamp = time();
+		$signature = 't=' . $timestamp . ',v1=' . hash_hmac( 'sha256', $timestamp . '.' . $payload, $secret );
+
+		$this->expectException( \Vatly\Fluent\Exceptions\WebhookModeMismatchException::class );
+
+		$processor->handle( $payload, $signature );
+	}
+
 	public function test_container_memoises_instances(): void {
 		Functions\when( 'get_option' )->justReturn( '' );
 

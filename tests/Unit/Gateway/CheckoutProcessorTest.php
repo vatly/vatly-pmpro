@@ -47,6 +47,21 @@ class CheckoutProcessorTest extends TestCase {
 		self::assertSame('ord_1', $order->payment_transaction_id);
 	}
 
+	public function test_checkout_href_reads_the_hosted_checkout_url_from_the_api_response(): void {
+		$api_result = json_decode(
+			'{"id":"checkout_1","resource":"checkout","status":"created","testmode":true,'
+			. '"links":{"checkoutUrl":{"href":"https://pay.vatly.com/checkout/checkout_1","type":"text/html"},'
+			. '"self":{"href":"https://api.vatly.com/v1/checkouts/checkout_1","type":"application/json"},"order":null}}'
+		);
+
+		$checkout = \Vatly\API\Resources\ResourceFactory::createResourceFromApiResult(
+			$api_result,
+			new ApiCheckout( \Mockery::mock( VatlyApiClient::class ) )
+		);
+
+		self::assertSame( 'https://pay.vatly.com/checkout/checkout_1', CheckoutProcessor::checkout_href( $checkout ) );
+	}
+
 	public function test_finalize_returns_false_when_checkout_canceled(): void {
 		$container = new Container();
 

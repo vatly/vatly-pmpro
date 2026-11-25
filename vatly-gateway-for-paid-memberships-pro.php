@@ -3,7 +3,7 @@
  * Plugin Name:       Vatly Gateway for Paid Memberships Pro
  * Plugin URI:        https://docs.vatly.com/packages/pmpro/readme
  * Description:       Sell PMPro memberships through Vatly, the European Merchant of Record for AI, software and digital products. Vatly handles payments, tax and compliance.
- * Version:           0.3.1
+ * Version:           0.4.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Vatly
@@ -20,7 +20,7 @@ declare(strict_types=1);
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'VATLY_PMPRO_VERSION', '0.3.1' );
+define( 'VATLY_PMPRO_VERSION', '0.4.0' );
 define( 'VATLY_PMPRO_PLUGIN_FILE', __FILE__ );
 define( 'VATLY_PMPRO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'VATLY_PMPRO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

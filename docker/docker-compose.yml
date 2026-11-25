@@ -23,8 +23,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      mock-vatly:
-        condition: service_started
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: wordpress
@@ -38,6 +36,8 @@ services:
         define('WP_ENVIRONMENT_TYPE', 'local');
     ports:
       - "8080:80"
+      # mock-vatly shares this container's network, so its port is published here.
+      - "8081:8080"
     volumes:
       - wp_data:/var/www/html
       # Mount the plugin source live so edits hot-reload.
@@ -67,13 +67,20 @@ services:
   # Lightweight mock of the Vatly API — just enough to drive the plugin through
   # checkout, return, webhook delivery and cancellation locally. Used by the
   # integration tests too.
+  #
+  # It runs in the WordPress container's network, so WordPress calls it at
+  # http://localhost:8080: the Vatly PHP SDK refuses plain http for any other
+  # host. It posts webhooks to WordPress on the same localhost.
   mock-vatly:
     build:
       context: ./mock-vatly
+    network_mode: "service:wordpress"
+    depends_on:
+      wordpress:
+        condition: service_started
     environment:
       MOCK_VATLY_PUBLIC_URL: http://localhost:8081
-    ports:
-      - "8081:8080"
+      VATLY_WEBHOOK_URL: http://localhost/wp-json/vatly/v1/webhook
 
 volumes:
   db_data:
