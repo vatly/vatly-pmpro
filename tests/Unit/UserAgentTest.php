@@ -78,10 +78,10 @@ class UserAgentTest extends TestCase {
 			}
 		);
 
-		$vatly      = ( new Container() )->get( Vatly::class );
-		$user_agent = $vatly->getApiClient()->performHttpCall( 'GET', 'user-agent' )->userAgent;
+		$client     = ( new Container() )->get( Vatly::class )->getApiClient();
+		$user_agent = $client->performHttpCall( 'GET', 'user-agent' )->userAgent;
 
-		self::assertStringContainsString( ' PHP/' . phpversion() . ' Curl/* ', $user_agent );
+		self::assertSame( implode( ' ', $client->getVersionStrings() ), $user_agent );
 		self::assertStringEndsWith( ' vatly/vatly-pmpro/' . VATLY_PMPRO_VERSION, $user_agent );
 		self::assertSame( 1, substr_count( $user_agent, 'vatly/vatly-pmpro/' ) );
 	}
