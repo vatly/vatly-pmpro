@@ -8,6 +8,9 @@ parameters:
         - includes
     excludePaths:
         - vendor/*
+    # Constants the plugin's main file defines.
+    scanFiles:
+        - vatly-gateway-for-paid-memberships-pro.php
     ignoreErrors:
         # WP globals + PMPro functions guarded with function_exists() / class_exists().
         -

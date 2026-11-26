@@ -25,4 +25,7 @@ require_once $autoload;
 
 require_once __DIR__ . '/WPStubs.php';
 require_once __DIR__ . '/PMProStubs.php';
+
+// The plugin's main file, which defines its constants, isn't loaded here.
+defined('VATLY_PMPRO_VERSION') || define('VATLY_PMPRO_VERSION', '0.0.0');
 require_once dirname(__DIR__) . '/includes/class-pmprogateway-vatly.php';

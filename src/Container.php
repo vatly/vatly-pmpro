@@ -140,7 +140,16 @@ class Container {
 
 		$this->set(
 			Vatly::class,
-			static fn( Container $c ): Vatly => new Vatly( $c->get( Wiring::class ) )
+			static function ( Container $c ): Vatly {
+				$vatly = new Vatly( $c->get( Wiring::class ) );
+
+				// The release zip bundles scoped dependencies, so the plugin's
+				// own version comes from the constant the release bumps, not
+				// from Composer.
+				$vatly->getApiClient()->addVersionString( 'vatly/vatly-pmpro/' . VATLY_PMPRO_VERSION );
+
+				return $vatly;
+			}
 		);
 
 		// We construct WebhookProcessor directly rather than going through
